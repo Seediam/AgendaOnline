@@ -1,0 +1,24 @@
+{
+  "name": "Agenda dos Gatinhos",
+  "short_name": "Gatinhos",
+  "description": "Agenda, economia, treinos, jogos e muito carinho do casal em tempo real.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#fff7fb",
+  "theme_color": "#ff7eb6",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
