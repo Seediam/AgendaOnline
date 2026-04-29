@@ -2,11 +2,12 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#ff7eb6" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#ff7eb6" id="themeMeta" />
   <title>Agenda dos Gatinhos</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
+    /* TEMAS DE CORES */
     :root {
       --bg: #fff7fb;
       --bg2: #f4f0ff;
@@ -24,7 +25,27 @@
       --radius: 24px;
     }
 
-    * { box-sizing: border-box; }
+    [data-theme="blue"] {
+      --bg: #f0f8ff;
+      --bg2: #e6f2ff;
+      --primary: #4ea8de;
+      --primary2: #5390d9;
+      --text: #1a2a3a;
+      --muted: #5c728a;
+    }
+
+    [data-theme="dark"] {
+      --bg: #121212;
+      --bg2: #1e1e24;
+      --card: rgba(30, 30, 36, 0.9);
+      --text: #f0f0f0;
+      --muted: #a0a0a0;
+      --primary: #ff7eb6;
+      --primary2: #9b7cff;
+      --shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
     body {
       margin: 0;
@@ -32,22 +53,26 @@
       font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       color: var(--text);
       background:
-        radial-gradient(circle at top left, rgba(255, 126, 182, 0.25), transparent 36%),
-        radial-gradient(circle at top right, rgba(155, 124, 255, 0.25), transparent 34%),
+        radial-gradient(circle at top left, rgba(var(--primary-rgb, 255, 126, 182), 0.25), transparent 36%),
+        radial-gradient(circle at top right, rgba(var(--primary2-rgb, 155, 124, 255), 0.25), transparent 34%),
         linear-gradient(135deg, var(--bg), var(--bg2));
+      background-attachment: fixed;
       overflow-x: hidden;
+      transition: background 0.3s ease, color 0.3s ease;
     }
 
-    .app { width: min(1240px, 100%); margin: 0 auto; padding: 22px; }
+    .app { width: min(1240px, 100%); margin: 0 auto; padding: 22px; padding-bottom: 100px; }
 
     .hero {
       position: relative;
       overflow: hidden;
       border-radius: 34px;
       padding: 28px;
-      background: linear-gradient(135deg, rgba(255,255,255,.94), rgba(255,255,255,.62));
+      background: linear-gradient(135deg, rgba(255,255,255,.1), rgba(255,255,255,.05));
+      backdrop-filter: blur(10px);
+      background-color: var(--card);
       box-shadow: var(--shadow);
-      border: 1px solid rgba(255,255,255,.75);
+      border: 1px solid rgba(155, 124, 255, 0.2);
     }
 
     .hero::after {
@@ -82,8 +107,8 @@
       min-width: 280px;
       padding: 14px 16px;
       border-radius: 20px;
-      background: rgba(255,255,255,.66);
-      border: 1px solid rgba(255,255,255,.8);
+      background: var(--card);
+      border: 1px solid rgba(155, 124, 255, 0.2);
     }
 
     .sync-dot {
@@ -95,30 +120,34 @@
       box-shadow: 0 0 0 6px rgba(247, 157, 101, .16);
       margin-right: 8px;
     }
-
     .sync-dot.online { background: var(--green); box-shadow: 0 0 0 6px rgba(76, 201, 166, .16); }
     .sync-dot.error { background: var(--red); box-shadow: 0 0 0 6px rgba(239, 71, 111, .16); }
 
+    /* ROLAGEM HORIZONTAL NAS ABAS */
     .tabs {
-      display: grid;
-      grid-template-columns: repeat(8, minmax(110px, 1fr));
+      display: flex;
+      overflow-x: auto;
       gap: 10px;
       margin: 20px 0;
+      padding-bottom: 10px;
+      scrollbar-width: none;
     }
+    .tabs::-webkit-scrollbar { display: none; }
 
     .tab-btn {
+      flex: 0 0 auto;
       border: 0;
       border-radius: 18px;
-      padding: 14px 10px;
+      padding: 14px 16px;
       cursor: pointer;
       font-weight: 900;
       color: var(--text);
-      background: rgba(255,255,255,.6);
+      background: var(--card);
       box-shadow: 0 8px 22px rgba(85, 57, 99, .08);
       transition: .2s ease;
+      white-space: nowrap;
     }
-
-    .tab-btn:hover { transform: translateY(-2px); }
+    .tab-btn:hover, .tab-btn:active { transform: translateY(-3px) scale(1.02); }
     .tab-btn.active { color: white; background: linear-gradient(135deg, var(--primary), var(--primary2)); box-shadow: 0 14px 28px rgba(155, 124, 255, .25); }
 
     .grid { display: grid; grid-template-columns: 1.08fr .92fr; gap: 18px; }
@@ -130,165 +159,144 @@
     .card {
       background: var(--card);
       backdrop-filter: blur(12px);
-      border: 1px solid rgba(255,255,255,.82);
+      border: 1px solid rgba(155, 124, 255, 0.2);
       border-radius: var(--radius);
       padding: 20px;
       box-shadow: var(--shadow);
       margin-bottom: 18px;
     }
-
     .card h2, .card h3 { margin: 0 0 12px; }
 
     .form-row { display: grid; grid-template-columns: repeat(12, 1fr); gap: 10px; align-items: end; }
-
-    label {
-      display: block;
-      font-size: 12px;
-      font-weight: 900;
-      color: var(--muted);
-      margin-bottom: 6px;
-      text-transform: uppercase;
-      letter-spacing: .5px;
-    }
+    label { display: block; font-size: 12px; font-weight: 900; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .5px; }
 
     input, select, textarea {
-      width: 100%;
-      border: 1px solid rgba(100, 79, 120, .16);
-      border-radius: 16px;
-      padding: 13px 14px;
-      font: inherit;
-      color: var(--text);
-      background: rgba(255,255,255,.84);
-      outline: none;
-      transition: .18s ease;
+      width: 100%; border: 1px solid rgba(100, 79, 120, .16); border-radius: 16px;
+      padding: 13px 14px; font: inherit; color: var(--text); background: rgba(255,255,255,.1); outline: none; transition: .18s ease;
     }
-
     input:focus, select:focus, textarea:focus { border-color: rgba(155, 124, 255, .65); box-shadow: 0 0 0 4px rgba(155, 124, 255, .12); }
     textarea { min-height: 110px; resize: vertical; }
 
-    .span-2 { grid-column: span 2; }
-    .span-3 { grid-column: span 3; }
-    .span-4 { grid-column: span 4; }
-    .span-5 { grid-column: span 5; }
-    .span-6 { grid-column: span 6; }
-    .span-7 { grid-column: span 7; }
-    .span-8 { grid-column: span 8; }
-    .span-12 { grid-column: span 12; }
+    .span-2 { grid-column: span 2; } .span-3 { grid-column: span 3; } .span-4 { grid-column: span 4; } .span-5 { grid-column: span 5; } .span-6 { grid-column: span 6; } .span-8 { grid-column: span 8; } .span-10 { grid-column: span 10; } .span-12 { grid-column: span 12; }
 
     .btn {
-      border: 0;
-      border-radius: 16px;
-      padding: 13px 16px;
-      cursor: pointer;
-      font-weight: 950;
-      color: white;
-      background: linear-gradient(135deg, var(--primary), var(--primary2));
-      box-shadow: 0 12px 26px rgba(255, 126, 182, .24);
-      transition: .2s ease;
+      border: 0; border-radius: 16px; padding: 13px 16px; cursor: pointer; font-weight: 950; color: white;
+      background: linear-gradient(135deg, var(--primary), var(--primary2)); box-shadow: 0 12px 26px rgba(255, 126, 182, .24); transition: .2s ease;
     }
-
-    .btn:hover { transform: translateY(-2px); }
-    .btn.ghost { color: var(--text); background: rgba(255,255,255,.72); box-shadow: none; border: 1px solid rgba(100, 79, 120, .12); }
-    .btn.danger { background: linear-gradient(135deg, #ff758f, #ef476f); }
+    .btn:active { transform: scale(0.95); }
+    .btn.ghost { color: var(--text); background: transparent; box-shadow: none; border: 1px solid rgba(100, 79, 120, .2); }
     .btn.green { background: linear-gradient(135deg, #4cc9a6, #42a5f5); }
 
     .list { display: grid; gap: 10px; }
-
-    .item {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 12px;
-      align-items: center;
-      padding: 14px;
-      border-radius: 18px;
-      background: rgba(255,255,255,.7);
-      border: 1px solid rgba(255,255,255,.8);
-    }
-
-    .item.done { opacity: .62; }
-    .item.done .title { text-decoration: line-through; }
+    .item { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; padding: 14px; border-radius: 18px; background: rgba(0,0,0,0.03); border: 1px solid rgba(155, 124, 255, 0.1); }
+    .item.done { opacity: .62; } .item.done .title { text-decoration: line-through; }
     .title { font-weight: 950; margin-bottom: 3px; }
     .meta { font-size: 13px; color: var(--muted); line-height: 1.45; }
     .actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+    .mini { border: 0; border-radius: 12px; padding: 9px 10px; cursor: pointer; background: var(--card); color: var(--text); font-weight: 950; box-shadow: 0 2px 5px rgba(0,0,0,0.1); transition: 0.2s; }
+    .mini:active { transform: scale(0.9); }
 
-    .mini {
-      border: 0;
-      border-radius: 12px;
-      padding: 9px 10px;
-      cursor: pointer;
-      background: rgba(255,255,255,.86);
-      color: var(--text);
-      font-weight: 950;
-    }
-
-    .total-big {
-      font-size: clamp(30px, 5vw, 50px);
-      font-weight: 1000;
-      letter-spacing: -2px;
-      background: linear-gradient(135deg, var(--primary), var(--primary2));
-      -webkit-background-clip: text;
-      color: transparent;
-    }
+    .total-big { font-size: clamp(30px, 5vw, 50px); font-weight: 1000; letter-spacing: -2px; background: linear-gradient(135deg, var(--primary), var(--primary2)); -webkit-background-clip: text; color: transparent; }
 
     .chips { display: flex; flex-wrap: wrap; gap: 8px; }
-    .chip { padding: 8px 10px; border-radius: 999px; background: rgba(255,255,255,.75); border: 1px solid rgba(100, 79, 120, .12); font-weight: 850; font-size: 13px; }
-    .chip.red { color: #9d174d; background: rgba(255, 214, 232, .75); }
-    .chip.green { color: #126b56; background: rgba(201, 244, 231, .75); }
-    .chip.blue { color: #155e83; background: rgba(203, 233, 255, .75); }
+    .chip { padding: 8px 10px; border-radius: 999px; background: var(--card); border: 1px solid rgba(100, 79, 120, .12); font-weight: 850; font-size: 13px; }
+    .chip.red { color: #ef476f; border-color: rgba(239, 71, 111, .3); }
+    .chip.green { color: #4cc9a6; border-color: rgba(76, 201, 166, .3); }
+
+    /* TOAST DE NOTIFICAÇÃO */
+    .toast-container { position: fixed; top: 15px; left: 50%; transform: translateX(-50%); z-index: 9999; display: flex; flex-direction: column; gap: 10px; width: 90%; max-width: 400px; pointer-events: none; }
+    .toast { background: var(--card); backdrop-filter: blur(10px); border-left: 5px solid var(--primary); padding: 14px 18px; border-radius: 12px; box-shadow: 0 8px 25px rgba(0,0,0,0.2); color: var(--text); transform: translateY(-100px); opacity: 0; transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .toast strong { display: block; font-size: 14px; margin-bottom: 4px; }
+    .toast span { font-size: 13px; color: var(--muted); }
+
+    /* ANIMAÇÕES GLOBAIS (CORAÇÕES E GATOS) */
+    .floating-emoji {
+      position: fixed;
+      pointer-events: none;
+      font-size: 24px;
+      animation: floatUp 1.2s ease-out forwards;
+      z-index: 10000;
+    }
+    @keyframes floatUp {
+      0% { transform: translateY(0) scale(0.5); opacity: 1; }
+      100% { transform: translateY(-80px) scale(1.5); opacity: 0; }
+    }
+
+    .wiggle { animation: wiggle 0.5s ease-in-out; }
+    @keyframes wiggle {
+      0%, 100% { transform: rotate(0deg); }
+      25% { transform: rotate(-15deg) scale(1.1); }
+      50% { transform: rotate(15deg) scale(1.1); }
+      75% { transform: rotate(-15deg) scale(1.1); }
+    }
+
+    /* BOTÃO MANDAR BEIJO (FAB) */
+    .fab-kiss {
+      position: fixed;
+      bottom: 30px;
+      right: 30px;
+      width: 65px;
+      height: 65px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #ff7eb6, #ff758f);
+      border: none;
+      box-shadow: 0 10px 25px rgba(255, 126, 182, 0.5);
+      cursor: pointer;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .fab-kiss:active { transform: scale(0.85); box-shadow: 0 5px 15px rgba(255, 126, 182, 0.4); }
+
+    /* CHAT, JOGO DA VELHA E NOTAS */
+    .chat-box { height: 400px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding: 10px; background: rgba(0,0,0,0.02); border-radius: 16px; margin-bottom: 12px; }
+    .msg { max-width: 80%; padding: 10px 14px; border-radius: 16px; position: relative; font-size: 14px; }
+    .msg.me { align-self: flex-end; background: linear-gradient(135deg, var(--primary), var(--primary2)); color: white; border-bottom-right-radius: 4px; }
+    .msg.them { align-self: flex-start; background: var(--card); border: 1px solid rgba(155, 124, 255, 0.2); border-bottom-left-radius: 4px; }
+    .msg-name { font-size: 10px; opacity: 0.7; margin-bottom: 2px; display: block; font-weight: bold; }
+
+    .board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; max-width: 300px; margin: 0 auto; }
+    .cell { aspect-ratio: 1; background: var(--card); border: 2px solid var(--primary); border-radius: 12px; display: grid; place-items: center; font-size: 40px; font-weight: 900; cursor: pointer; color: var(--text); }
+    .game-status { text-align: center; font-weight: bold; margin-bottom: 15px; font-size: 20px; }
 
     .postit-board { display: grid; grid-template-columns: repeat(auto-fit, minmax(215px, 1fr)); gap: 14px; }
-    .postit { min-height: 150px; padding: 16px; border-radius: 22px; box-shadow: 0 12px 28px rgba(60, 40, 70, .14); transform: rotate(var(--rot)); border: 1px solid rgba(255,255,255,.62); }
-    .pink { background: #ffd6e8; }
-    .purple { background: #ddd4ff; }
-    .yellow { background: #fff0b8; }
-    .green-note { background: #c9f4e7; }
-    .blue-note { background: #cbe9ff; }
-    .note-content { white-space: pre-wrap; color: #503d52; line-height: 1.45; }
+    .postit { min-height: 150px; padding: 16px; border-radius: 22px; box-shadow: 0 12px 28px rgba(0,0,0, .1); transform: rotate(var(--rot)); color: #352437; }
+    .pink { background: #ffd6e8; } .purple { background: #ddd4ff; } .yellow { background: #fff0b8; } .green-note { background: #c9f4e7; } .blue-note { background: #cbe9ff; }
+    .note-content { white-space: pre-wrap; line-height: 1.45; }
 
     .cat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
-    .cat-card { border-radius: 22px; padding: 16px; background: rgba(255,255,255,.7); border: 1px solid rgba(255,255,255,.75); text-align: center; }
-    .cat-face { font-size: 42px; margin-bottom: 6px; }
+    .cat-card { border-radius: 22px; padding: 16px; background: var(--card); border: 1px solid rgba(155,124,255,.2); text-align: center; cursor: pointer; transition: 0.2s; }
+    .cat-card:active { transform: scale(0.95); }
+    .cat-face { display: flex; justify-content: center; margin-bottom: 6px; }
 
     .progress-wrap { height: 12px; border-radius: 999px; background: rgba(100, 79, 120, .1); overflow: hidden; margin-top: 10px; }
     .progress { height: 100%; width: 0%; background: linear-gradient(90deg, var(--green), var(--primary2)); transition: .3s ease; }
+    .empty { padding: 18px; text-align: center; color: var(--muted); border: 2px dashed rgba(100, 79, 120, .16); border-radius: 20px; background: rgba(0,0,0,.02); }
 
-    .empty { padding: 18px; text-align: center; color: var(--muted); border: 2px dashed rgba(100, 79, 120, .16); border-radius: 20px; background: rgba(255,255,255,.38); }
-    .footer-actions { display: flex; flex-wrap: wrap; gap: 10px; }
-
-    .sql-box {
-      white-space: pre-wrap;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: 12px;
-      background: #241629;
-      color: #ffeaf5;
-      padding: 16px;
-      border-radius: 18px;
-      overflow-x: auto;
-      line-height: 1.55;
-    }
-
-    .pill-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
-    .small-help { font-size: 12px; color: var(--muted); margin-top: 6px; }
-
-    @media (max-width: 980px) {
-      .tabs { grid-template-columns: repeat(2, 1fr); }
-      .grid, .three-grid { grid-template-columns: 1fr; }
-    }
-
+    @media (max-width: 980px) { .grid, .three-grid { grid-template-columns: 1fr; } }
     @media (max-width: 760px) {
-      .app { padding: 12px; }
+      .app { padding: 12px; padding-bottom: 100px; }
       .hero { padding: 20px; border-radius: 26px; }
-      .brand { align-items: flex-start; }
-      .cat-logo { width: 58px; height: 58px; font-size: 30px; }
       .form-row { grid-template-columns: 1fr; }
-      .span-2, .span-3, .span-4, .span-5, .span-6, .span-7, .span-8, .span-12 { grid-column: auto; }
+      .span-2, .span-3, .span-4, .span-5, .span-6, .span-8, .span-10, .span-12 { grid-column: auto; }
       .cat-row { grid-template-columns: 1fr; }
       .item { grid-template-columns: 1fr; }
-      .actions { justify-content: flex-start; }
+      .fab-kiss { bottom: 20px; right: 20px; width: 55px; height: 55px; font-size: 28px; }
     }
   </style>
 </head>
 <body>
+
+  <!-- TOAST DE NOTIFICAÇÃO -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- BOTÃO MANDAR BEIJO -->
+  <button class="fab-kiss" onclick="sendKiss()" title="Mandar beijo!💖">💖</button>
+
   <main class="app">
     <section class="hero">
       <div class="topline">
@@ -296,33 +304,38 @@
           <div class="cat-logo">🐱</div>
           <div>
             <h1>Agenda dos Gatinhos</h1>
-            <p class="subtitle">Agenda, gastos, compras, treinos, metas e anotações do casal em tempo real.</p>
+            <p class="subtitle">Agenda, economia, treinos, jogos e muito carinho em tempo real.</p>
           </div>
         </div>
         <div class="sync-box">
           <strong><span id="syncDot" class="sync-dot"></span><span id="syncTitle">Modo local ativo</span></strong>
-          <div class="meta" id="syncText">Configure o Supabase na aba ⚙️ para sincronizar entre vocês dois.</div>
+          <div class="meta" id="syncText">Configure o Supabase na aba ⚙️ para sincronizar.</div>
         </div>
       </div>
     </section>
 
+    <!-- ABAS -->
     <nav class="tabs">
       <button class="tab-btn active" data-tab="dashboard">🏠 Início</button>
-      <button class="tab-btn" data-tab="gastos">💰 Gastos</button>
+      <button class="tab-btn" data-tab="chat">💬 Chat</button>
+      <button class="tab-btn" data-tab="economia">💰 Economia</button>
       <button class="tab-btn" data-tab="compras">🛒 Compras</button>
       <button class="tab-btn" data-tab="lembretes">🔔 Lembretes</button>
-      <button class="tab-btn" data-tab="treino">🏋️ Treinos</button>
+      <button class="tab-btn" data-tab="treino">⚽ Esporte/Treino</button>
       <button class="tab-btn" data-tab="metas">🎯 Metas</button>
       <button class="tab-btn" data-tab="notas">📝 Notas</button>
-      <button class="tab-btn" data-tab="config">⚙️ Online</button>
+      <button class="tab-btn" data-tab="jogos">🎮 Jogos</button>
+      <button class="tab-btn" data-tab="config">⚙️ Config</button>
     </nav>
 
+    <!-- INÍCIO -->
     <section id="dashboard" class="panel active">
       <div class="three-grid">
         <div class="card">
-          <h3>Resumo financeiro 💰</h3>
-          <div class="total-big" id="dashTotal">R$ 0,00</div>
-          <div class="chips" id="dashFinanceChips"></div>
+          <h3>Resumo da Economia 💰</h3>
+          <div class="meta">Sobra do mês:</div>
+          <div class="total-big" id="dashSobra">R$ 0,00</div>
+          <div class="chips" style="margin-top:10px" id="dashFinanceChips"></div>
         </div>
         <div class="card">
           <h3>Hoje e próximos dias 🔔</h3>
@@ -340,233 +353,337 @@
         <div class="card">
           <h2>Central do casal 💞</h2>
           <div class="chips">
-            <span class="chip" id="chipTotal">Total gasto: R$ 0,00</span>
+            <span class="chip red" id="chipTotal">Gastos: R$ 0,00</span>
+            <span class="chip green" id="chipRenda">Renda: R$ 0,00</span>
             <span class="chip" id="chipPendentes">Lembretes: 0</span>
             <span class="chip" id="chipTreinos">Treinos: 0</span>
             <span class="chip" id="chipCompras">Compras: 0</span>
             <span class="chip" id="chipMetas">Metas: 0</span>
-            <span class="chip" id="chipNotas">Notas: 0</span>
           </div>
         </div>
+        
+        <!-- NOSSOS GATINHOS -->
         <aside class="card">
           <h3>Nossos três gatinhos 🐾</h3>
+          <p class="meta" style="margin-top:-5px">Clique neles para fazer carinho!</p>
           <div class="cat-row">
-            <div class="cat-card"><div class="cat-face">🐈‍⬛</div><strong>Preto</strong><div class="meta">Guarda os segredos</div></div>
-            <div class="cat-card"><div class="cat-face">🐈</div><strong>Cinza</strong><div class="meta">Fiscal dos gastos</div></div>
-            <div class="cat-card"><div class="cat-face">😼</div><strong>Rajado</strong><div class="meta">Chefe dos treinos</div></div>
+            
+            <div class="cat-card" onclick="petCat(this, 'Nala')">
+              <div class="cat-face">
+                <svg viewBox="0 0 100 100" width="60" height="60">
+                  <path d="M 20 45 L 15 15 L 45 30 Z" fill="#222"/>
+                  <path d="M 80 45 L 85 15 L 55 30 Z" fill="#222"/>
+                  <path d="M 23 38 L 20 22 L 38 30 Z" fill="#ffb3c6"/>
+                  <path d="M 77 38 L 80 22 L 62 30 Z" fill="#ffb3c6"/>
+                  <circle cx="50" cy="55" r="35" fill="#222"/>
+                  <path d="M 18 65 Q 50 45 82 65 A 35 35 0 0 1 18 65 Z" fill="#fff"/> 
+                  <circle cx="35" cy="48" r="6" fill="#ffd166"/> <circle cx="35" cy="48" r="2" fill="#222"/>
+                  <circle cx="65" cy="48" r="6" fill="#ffd166"/> <circle cx="65" cy="48" r="2" fill="#222"/>
+                  <ellipse cx="50" cy="62" rx="4" ry="3" fill="#ff7eb6"/>
+                  <path d="M 45 68 Q 50 72 55 68" fill="transparent" stroke="#222" stroke-width="2"/>
+                </svg>
+              </div>
+              <strong>Nala</strong>
+              <div class="meta">Guarda segredos</div>
+            </div>
+
+            <div class="cat-card" onclick="petCat(this, 'Gris')">
+              <div class="cat-face">
+                <svg viewBox="0 0 100 100" width="60" height="60">
+                  <path d="M 20 45 L 15 15 L 45 30 Z" fill="#8c92ac"/>
+                  <path d="M 80 45 L 85 15 L 55 30 Z" fill="#8c92ac"/>
+                  <path d="M 23 38 L 20 22 L 38 30 Z" fill="#ffb3c6"/>
+                  <path d="M 77 38 L 80 22 L 62 30 Z" fill="#ffb3c6"/>
+                  <circle cx="50" cy="55" r="35" fill="#8c92ac"/>
+                  <ellipse cx="50" cy="65" rx="15" ry="10" fill="#e2e5ec"/> 
+                  <circle cx="35" cy="48" r="6" fill="#ffd166"/> <circle cx="35" cy="48" r="2" fill="#222"/>
+                  <circle cx="65" cy="48" r="6" fill="#ffd166"/> <circle cx="65" cy="48" r="2" fill="#222"/>
+                  <ellipse cx="50" cy="62" rx="4" ry="3" fill="#ff7eb6"/>
+                  <path d="M 45 68 Q 50 72 55 68" fill="transparent" stroke="#222" stroke-width="2"/>
+                </svg>
+              </div>
+              <strong>Gris</strong>
+              <div class="meta">Fiscal da economia</div>
+            </div>
+
+            <div class="cat-card" onclick="petCat(this, 'Simba')">
+              <div class="cat-face">
+                <svg viewBox="0 0 100 100" width="60" height="60">
+                  <path d="M 20 45 L 15 15 L 45 30 Z" fill="#a9b0c0"/>
+                  <path d="M 80 45 L 85 15 L 55 30 Z" fill="#a9b0c0"/>
+                  <path d="M 23 38 L 20 22 L 38 30 Z" fill="#ffb3c6"/>
+                  <path d="M 77 38 L 80 22 L 62 30 Z" fill="#ffb3c6"/>
+                  <circle cx="50" cy="55" r="35" fill="#a9b0c0"/>
+                  <path d="M 18 65 Q 50 40 82 65 A 35 35 0 0 1 18 65 Z" fill="#fff"/> 
+                  <path d="M 50 20 L 50 35 M 40 22 L 45 33 M 60 22 L 55 33" stroke="#6b7280" stroke-width="3" stroke-linecap="round"/>
+                  <path d="M 15 55 L 23 55 M 16 62 L 22 60" stroke="#6b7280" stroke-width="3" stroke-linecap="round"/>
+                  <path d="M 85 55 L 77 55 M 84 62 L 78 60" stroke="#6b7280" stroke-width="3" stroke-linecap="round"/>
+                  <circle cx="35" cy="48" r="6" fill="#ffd166"/> <circle cx="35" cy="48" r="2" fill="#222"/>
+                  <circle cx="65" cy="48" r="6" fill="#ffd166"/> <circle cx="65" cy="48" r="2" fill="#222"/>
+                  <ellipse cx="50" cy="62" rx="4" ry="3" fill="#ff7eb6"/>
+                  <path d="M 45 68 Q 50 72 55 68" fill="transparent" stroke="#222" stroke-width="2"/>
+                </svg>
+              </div>
+              <strong>Simba</strong>
+              <div class="meta">Chefe dos treinos</div>
+            </div>
+            
           </div>
         </aside>
       </div>
     </section>
 
-    <section id="gastos" class="panel">
+    <!-- CHAT -->
+    <section id="chat" class="panel">
       <div class="grid">
         <div class="card">
-          <h2>Lista de gastos</h2>
+          <h2>Nosso Chat Privado 💬</h2>
+          <div id="chatMessages" class="chat-box"></div>
           <div class="form-row">
-            <div class="span-3"><label>Item</label><input id="expenseItem" placeholder="Ex: Mercado" /></div>
-            <div class="span-3"><label>Categoria</label><select id="expenseCategory"><option>Casa</option><option>Mercado</option><option>Comida</option><option>Pet</option><option>Transporte</option><option>Lazer</option><option>Saúde</option><option>Treino</option><option>Outro</option></select></div>
-            <div class="span-3"><label>Quem pagou</label><select id="expensePerson"><option value="Eu">Eu</option><option value="Namorada">Namorada</option><option value="Nós dois">Nós dois</option></select></div>
-            <div class="span-3"><label>Valor</label><input id="expenseValue" type="number" step="0.01" placeholder="0,00" /></div>
-            <div class="span-12"><label>Descrição</label><input id="expenseDesc" placeholder="Ex: Compra do mês, ração dos gatos, cinema..." /></div>
-            <button class="btn span-12" onclick="addExpense()">Adicionar gasto</button>
+            <div class="span-10"><input id="chatInput" placeholder="Digite uma mensagem..." onkeypress="if(event.key === 'Enter') sendChat()" /></div>
+            <div class="span-2"><button class="btn" onclick="sendChat()">Enviar</button></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ECONOMIA -->
+    <section id="economia" class="panel">
+      <div class="grid">
+        <div class="card">
+          <h2>Caixas do Mês (Renda) 💵</h2>
+          <div class="form-row">
+            <div class="span-6"><label>Minha Renda</label><input id="rendaEu" type="number" step="0.01" placeholder="Ex: 3000.00" /></div>
+            <div class="span-6"><label>Renda Dela</label><input id="rendaEla" type="number" step="0.01" placeholder="Ex: 3000.00" /></div>
+            <button class="btn span-12 ghost" onclick="saveIncomes()">Salvar Rendas</button>
+          </div>
+          <hr style="border: 0; border-top: 1px solid rgba(155,124,255,0.2); margin: 20px 0;">
+          <h2>Adicionar Gasto 💸</h2>
+          <div class="form-row">
+            <div class="span-4"><label>Item</label><input id="expenseItem" placeholder="Ex: Mercado..." /></div>
+            <div class="span-4"><label>Categoria</label><select id="expenseCategory"><option>Casa</option><option>Mercado</option><option>Contas</option><option>Lazer</option><option>Pet</option><option>Outro</option></select></div>
+            <div class="span-4"><label>Valor</label><input id="expenseValue" type="number" step="0.01" placeholder="0,00" /></div>
+            <button class="btn span-12" onclick="addExpense()">Registrar Gasto</button>
           </div>
         </div>
         <aside class="card">
-          <h2>Total</h2>
-          <div class="total-big" id="expenseTotal">R$ 0,00</div>
-          <div class="chips" id="expenseByPerson"></div>
-          <div class="card" style="box-shadow:none;margin:14px 0 0;background:rgba(255,255,255,.46)">
-            <h3>Divisão 50/50</h3>
-            <div class="meta" id="splitInfo">Sem gastos ainda.</div>
-          </div>
-          <button class="btn ghost" onclick="exportData()">Exportar backup</button>
+          <h2>Balanço do Mês</h2>
+          <p class="meta" style="margin-bottom: 5px;">Renda Total Juntada:</p>
+          <h3 id="ecoTotalIncome" style="color: var(--green); margin-bottom: 15px;">R$ 0,00</h3>
+          <p class="meta" style="margin-bottom: 5px;">Total de Gastos:</p>
+          <h3 id="ecoTotalExpense" style="color: var(--red); margin-bottom: 15px;">R$ 0,00</h3>
+          <p class="meta" style="margin-bottom: 5px; font-weight: bold;">Sobra Extra:</p>
+          <div class="total-big" id="ecoSobra">R$ 0,00</div>
         </aside>
       </div>
-      <div class="card"><div id="expenseList" class="list"></div></div>
+      <div class="card"><h3>Histórico de Gastos</h3><div id="expenseList" class="list"></div></div>
     </section>
 
+    <!-- OUTRAS SESSÕES (Compras, Lembretes, Treinos, Metas, Notas, Jogos, Config) -->
     <section id="compras" class="panel">
       <div class="grid">
         <div class="card">
           <h2>Lista de compras</h2>
           <div class="form-row">
-            <div class="span-4"><label>Produto</label><input id="shopItem" placeholder="Ex: Ração, arroz, shampoo" /></div>
-            <div class="span-2"><label>Qtd</label><input id="shopQty" placeholder="Ex: 2" /></div>
-            <div class="span-3"><label>Categoria</label><select id="shopCategory"><option>Mercado</option><option>Casa</option><option>Pet</option><option>Farmácia</option><option>Treino</option><option>Outro</option></select></div>
-            <div class="span-3"><label>Estimativa</label><input id="shopEstimate" type="number" step="0.01" placeholder="R$ opcional" /></div>
+            <div class="span-4"><label>Produto</label><input id="shopItem" /></div>
+            <div class="span-2"><label>Qtd</label><input id="shopQty" /></div>
+            <div class="span-3"><label>Categoria</label><select id="shopCategory"><option>Mercado</option><option>Casa</option><option>Pet</option><option>Farmácia</option><option>Outro</option></select></div>
+            <div class="span-3"><label>Estimativa</label><input id="shopEstimate" type="number" step="0.01" /></div>
             <button class="btn span-12" onclick="addShopping()">Adicionar compra</button>
           </div>
         </div>
-        <aside class="card">
-          <h3>Resumo das compras</h3>
-          <div class="chips" id="shoppingSummary"></div>
-          <p class="meta">Quando comprar, marque como feito. Se quiser, adicione o valor final nos gastos depois.</p>
-        </aside>
+        <aside class="card"><h3>Resumo</h3><div class="chips" id="shoppingSummary"></div></aside>
       </div>
       <div class="card"><div id="shoppingList" class="list"></div></div>
     </section>
 
     <section id="lembretes" class="panel">
-      <div class="grid">
-        <div class="card">
-          <h2>Lembretes</h2>
+      <div class="grid"><div class="card"><h2>Lembretes</h2>
           <div class="form-row">
-            <div class="span-5"><label>Título</label><input id="reminderTitle" placeholder="Ex: Pagar conta de luz" /></div>
+            <div class="span-5"><label>Título</label><input id="reminderTitle" /></div>
             <div class="span-3"><label>Data</label><input id="reminderDate" type="date" /></div>
             <div class="span-2"><label>Hora</label><input id="reminderTime" type="time" /></div>
-            <div class="span-2"><label>Prioridade</label><select id="reminderPriority"><option>Normal</option><option>Alta</option><option>Baixa</option></select></div>
-            <div class="span-12"><label>Descrição</label><textarea id="reminderDesc" placeholder="Escreva o detalhe do lembrete..."></textarea></div>
+            <div class="span-2"><label>Prioridade</label><select id="reminderPriority"><option>Normal</option><option>Alta</option></select></div>
+            <div class="span-12"><label>Descrição</label><textarea id="reminderDesc"></textarea></div>
             <button class="btn span-12" onclick="addReminder()">Criar lembrete</button>
-          </div>
-        </div>
-        <aside class="card">
-          <h3>Notificações</h3>
-          <p class="meta">Funciona enquanto o site estiver aberto. Push com site fechado exige PWA + serviço de push, que pode ser uma próxima etapa.</p>
-          <button class="btn" onclick="askNotificationPermission()">Ativar notificações locais</button>
-        </aside>
-      </div>
+          </div></div></div>
       <div class="card"><div id="reminderList" class="list"></div></div>
     </section>
 
     <section id="treino" class="panel">
-      <div class="grid">
-        <div class="card">
-          <h2>Treinamento</h2>
+      <div class="grid"><div class="card"><h2>Esportes e Treinamento ⚽</h2>
           <div class="form-row">
-            <div class="span-4"><label>Treino</label><input id="trainingTitle" placeholder="Ex: Cardio, estudo, academia" /></div>
-            <div class="span-3"><label>Data</label><input id="trainingDate" type="date" /></div>
-            <div class="span-2"><label>Hora</label><input id="trainingTime" type="time" /></div>
-            <div class="span-3"><label>Cor</label><select id="trainingColor"><option value="pink">Rosa</option><option value="purple">Roxo</option><option value="yellow">Amarelo</option><option value="green-note">Verde</option><option value="blue-note">Azul</option></select></div>
-            <div class="span-12"><label>Plano do treino</label><textarea id="trainingDesc" placeholder="Ex: 20 min aquecimento, 3 séries, alongamento..."></textarea></div>
-            <button class="btn span-12" onclick="addTraining()">Adicionar treino</button>
-          </div>
-        </div>
-        <aside class="card">
-          <h3>Ideias rápidas</h3>
-          <div class="chips">
-            <button class="mini" onclick="quickTraining('Caminhada', '30 minutos de caminhada leve juntos.')">🚶 Caminhada</button>
-            <button class="mini" onclick="quickTraining('Alongamento', '15 minutos de alongamento e respiração.')">🧘 Alongamento</button>
-            <button class="mini" onclick="quickTraining('Academia', 'Treino de força: superior, inferior ou full body.')">🏋️ Academia</button>
-            <button class="mini" onclick="quickTraining('Estudo', 'Sessão de estudo focada com pausa programada.')">📚 Estudo</button>
-            <button class="mini" onclick="quickTraining('Treino em casal', 'Aquecimento, circuito simples e alongamento final.')">💞 Casal</button>
-          </div>
-        </aside>
-      </div>
+            <div class="span-4"><label>Atividade</label><select id="trainingType"><option>Futebol</option><option>Vôlei</option><option>Academia</option><option>Corrida/Cardio</option></select></div>
+            <div class="span-4"><label>Data</label><input id="trainingDate" type="date" /></div>
+            <div class="span-4"><label>Cor</label><select id="trainingColor"><option value="pink">Rosa</option><option value="blue-note">Azul</option><option value="green-note">Verde</option><option value="yellow">Amarelo</option></select></div>
+            <div class="span-12"><label>Detalhes (Quem ganhou? Treino?)</label><textarea id="trainingDesc"></textarea></div>
+            <button class="btn span-12" onclick="addTraining()">Registrar Atividade</button>
+          </div></div></div>
       <div class="card"><div id="trainingList" class="postit-board"></div></div>
     </section>
 
     <section id="metas" class="panel">
-      <div class="grid">
-        <div class="card">
-          <h2>Metas do casal</h2>
+      <div class="grid"><div class="card"><h2>Metas do casal</h2>
           <div class="form-row">
-            <div class="span-4"><label>Meta</label><input id="goalTitle" placeholder="Ex: Guardar dinheiro, viajar, treinar" /></div>
-            <div class="span-3"><label>Categoria</label><select id="goalCategory"><option>Dinheiro</option><option>Saúde</option><option>Viagem</option><option>Casa</option><option>Pet</option><option>Estudo</option><option>Outro</option></select></div>
-            <div class="span-2"><label>Atual</label><input id="goalCurrent" type="number" step="0.01" placeholder="0" /></div>
-            <div class="span-3"><label>Objetivo</label><input id="goalTarget" type="number" step="0.01" placeholder="100" /></div>
-            <div class="span-12"><label>Observação</label><input id="goalDesc" placeholder="Ex: Meta para o mês, sonho de viagem, reserva de emergência..." /></div>
+            <div class="span-4"><label>Meta</label><input id="goalTitle" /></div>
+            <div class="span-3"><label>Categoria</label><select id="goalCategory"><option>Dinheiro</option><option>Viagem</option><option>Casa</option></select></div>
+            <div class="span-2"><label>Atual</label><input id="goalCurrent" type="number" /></div>
+            <div class="span-3"><label>Objetivo</label><input id="goalTarget" type="number" /></div>
             <button class="btn span-12" onclick="addGoal()">Criar meta</button>
-          </div>
-        </div>
-        <aside class="card">
-          <h3>Como usar</h3>
-          <p class="meta">Crie metas com valor atual e valor objetivo. Depois use +10, +50 ou editar apagando e criando outra meta atualizada.</p>
-        </aside>
-      </div>
+          </div></div></div>
       <div class="card"><div id="goalList" class="list"></div></div>
     </section>
 
     <section id="notas" class="panel">
-      <div class="grid">
-        <div class="card">
-          <h2>Anotações compartilhadas</h2>
+      <div class="grid"><div class="card"><h2>Anotações</h2>
           <div class="form-row">
-            <div class="span-8"><label>Título</label><input id="noteTitle" placeholder="Ex: Ideias para viagem" /></div>
-            <div class="span-4"><label>Cor</label><select id="noteColor"><option value="yellow">Amarelo</option><option value="pink">Rosa</option><option value="purple">Roxo</option><option value="green-note">Verde</option><option value="blue-note">Azul</option></select></div>
-            <div class="span-12"><label>Texto</label><textarea id="noteText" placeholder="Escrevam qualquer coisa aqui..."></textarea></div>
+            <div class="span-8"><label>Título</label><input id="noteTitle" /></div>
+            <div class="span-4"><label>Cor</label><select id="noteColor"><option value="yellow">Amarelo</option><option value="pink">Rosa</option><option value="purple">Roxo</option></select></div>
+            <div class="span-12"><label>Texto</label><textarea id="noteText"></textarea></div>
             <button class="btn span-12" onclick="addNote()">Salvar anotação</button>
-          </div>
-        </div>
-        <aside class="card">
-          <h3>Backup</h3>
-          <p class="meta">Mesmo online, mantenha backup de vez em quando.</p>
-          <div class="footer-actions">
-            <button class="btn ghost" onclick="exportData()">Exportar</button>
-            <label class="btn ghost" style="cursor:pointer;">Importar<input type="file" accept="application/json" onchange="importData(event)" style="display:none" /></label>
-          </div>
-        </aside>
-      </div>
+          </div></div></div>
       <div class="card"><div id="noteList" class="postit-board"></div></div>
+    </section>
+
+    <section id="jogos" class="panel">
+      <div class="card" style="text-align: center;"><h2>Jogo da Velha 🎮</h2>
+        <p class="meta">O tabuleiro atualiza no celular dos dois ao mesmo tempo.</p>
+        <div id="gameStatus" class="game-status">Vez do X</div>
+        <div class="board" id="ticTacToeBoard">
+          <div class="cell" onclick="playTicTacToe(0)"></div><div class="cell" onclick="playTicTacToe(1)"></div><div class="cell" onclick="playTicTacToe(2)"></div>
+          <div class="cell" onclick="playTicTacToe(3)"></div><div class="cell" onclick="playTicTacToe(4)"></div><div class="cell" onclick="playTicTacToe(5)"></div>
+          <div class="cell" onclick="playTicTacToe(6)"></div><div class="cell" onclick="playTicTacToe(7)"></div><div class="cell" onclick="playTicTacToe(8)"></div>
+        </div>
+        <button class="btn ghost" style="margin-top:20px; width: 300px; max-width: 100%;" onclick="resetTicTacToe()">Reiniciar</button>
+      </div>
     </section>
 
     <section id="config" class="panel">
       <div class="grid">
-        <div class="card">
-          <h2>Configurar modo online gratuito</h2>
-          <p class="meta">Use Supabase Free + GitHub Pages. Preencha os dados abaixo uma vez em cada celular. Usem o mesmo código de sala.</p>
+        <div class="card"><h2>Personalizar App 🎨</h2>
+          <div class="form-row"><div class="span-12"><label>Cor / Tema</label>
+              <select id="cfgTema" onchange="mudarTema()"><option value="pink">Rosa Gatinho</option><option value="blue">Azul Oceano</option><option value="dark">Modo Noturno</option></select>
+          </div></div></div>
+        <div class="card"><h2>Modo Online e Sala</h2>
           <div class="form-row">
-            <div class="span-6"><label>Seu nome</label><input id="cfgUserName" placeholder="Ex: Sidnei" /></div>
-            <div class="span-6"><label>Código da sala do casal</label><input id="cfgCoupleCode" placeholder="Ex: gatinhos-2026" /></div>
-            <div class="span-12"><label>Supabase Project URL</label><input id="cfgUrl" placeholder="https://xxxx.supabase.co" /></div>
-            <div class="span-12"><label>Supabase anon public key</label><input id="cfgKey" placeholder="cole a anon public key aqui" /></div>
-            <button class="btn green span-6" onclick="saveConfigAndConnect()">Salvar e conectar</button>
-            <button class="btn ghost span-3" onclick="disconnectCloud()">Usar modo local</button>
-            <button class="btn danger span-3" onclick="clearAllLocal()">Limpar local</button>
-          </div>
-        </div>
-        <aside class="card">
-          <h3>Passos rápidos</h3>
-          <ol class="meta" style="line-height:1.8;padding-left:20px">
-            <li>Crie conta em supabase.com.</li>
-            <li>New Project.</li>
-            <li>Vá em SQL Editor.</li>
-            <li>Cole o SQL abaixo e rode.</li>
-            <li>Em Project Settings → API, copie Project URL e anon key.</li>
-            <li>Cole aqui e use o mesmo código de sala nos dois celulares.</li>
-            <li>Suba este HTML no GitHub Pages como index.html.</li>
-          </ol>
-        </aside>
-      </div>
-      <div class="card">
-        <h3>SQL para criar a tabela no Supabase</h3>
-        <button class="btn ghost" onclick="copySql()">Copiar SQL</button>
-        <div id="sqlBox" class="sql-box"></div>
+            <div class="span-6"><label>Seu nome</label><input id="cfgUserName" /></div>
+            <div class="span-6"><label>Código da sala</label><input id="cfgCoupleCode" /></div>
+            <div class="span-12"><label>Supabase URL</label><input id="cfgUrl" /></div>
+            <div class="span-12"><label>Supabase Key</label><input id="cfgKey" /></div>
+            <button class="btn green span-12" onclick="saveConfigAndConnect()">Salvar Tudo</button>
+          </div></div>
       </div>
     </section>
   </main>
 
-  <script>
-    const STORAGE_KEY = 'agenda-gatinhos-v3';
-    const CONFIG_KEY = 'agenda-gatinhos-config-v1';
+ <script>
+    // --- GERENCIADOR DE AUDIO (WEB AUDIO API) ---
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    
+    function resumeAudio() { if(audioCtx.state === 'suspended') audioCtx.resume(); }
+
+    function playPopSound() {
+      resumeAudio();
+      const osc = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      osc.connect(gainNode); gainNode.connect(audioCtx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(300, audioCtx.currentTime + 0.1);
+      gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+      osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+    }
+
+    function playMeowSound() {
+      resumeAudio();
+      const osc = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      osc.connect(gainNode); gainNode.connect(audioCtx.destination);
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+      osc.frequency.linearRampToValueAtTime(600, audioCtx.currentTime + 0.1);
+      osc.frequency.exponentialRampToValueAtTime(300, audioCtx.currentTime + 0.3);
+      gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime);
+      gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.3);
+      osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+    }
+
+    function playMagicSound() {
+      resumeAudio();
+      for(let i=0; i<5; i++) {
+        setTimeout(() => {
+          const osc = audioCtx.createOscillator();
+          const gainNode = audioCtx.createGain();
+          osc.connect(gainNode); gainNode.connect(audioCtx.destination);
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(400 + (i*150), audioCtx.currentTime);
+          gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+          osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+        }, i * 50);
+      }
+    }
+
+    // --- EFEITOS VISUAIS E INTERAÇÕES ---
+    function createFloatingEmoji(x, y, emoji, isExplosion = false) {
+      const el = document.createElement('div');
+      el.className = 'floating-emoji';
+      el.innerText = emoji;
+      el.style.left = (x - 12) + 'px';
+      el.style.top = (y - 12) + 'px';
+      
+      if(isExplosion) {
+        el.style.transform = `translate(${Math.random()*100 - 50}px, ${Math.random()*100 - 50}px) scale(${Math.random() + 1})`;
+        el.style.animationDuration = (Math.random() * 1 + 1) + 's';
+      }
+      
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 1500);
+    }
+
+    document.addEventListener('click', (e) => {
+      resumeAudio(); 
+      if(e.target.tagName === 'BUTTON' || e.target.closest('.tab-btn') || e.target.closest('.cell') || e.target.closest('.mini')) {
+        playPopSound();
+      } else if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'SELECT' && !e.target.closest('.cat-card')) {
+        createFloatingEmoji(e.pageX, e.pageY, ['✨', '💖', '🐾'][Math.floor(Math.random()*3)]);
+      }
+    });
+
+    function petCat(element, name) {
+      element.classList.add('wiggle');
+      playMeowSound();
+      const rect = element.getBoundingClientRect();
+      for(let i=0; i<3; i++) {
+        setTimeout(() => {
+          createFloatingEmoji(rect.left + (rect.width/2) + (Math.random()*40 - 20), rect.top + (Math.random()*20), '💖', true);
+        }, i * 150);
+      }
+      setTimeout(() => element.classList.remove('wiggle'), 500);
+    }
+
+    function triggerHeartExplosion() {
+      playMagicSound();
+      for(let i=0; i<30; i++) {
+        setTimeout(() => {
+          const x = Math.random() * window.innerWidth;
+          const y = (window.innerHeight / 2) + (Math.random() * 200 - 100);
+          createFloatingEmoji(x, y, ['💖','💕','✨','🥰','😘'][Math.floor(Math.random()*5)], true);
+        }, i * 40);
+      }
+    }
+
+
+    // --- BANCO DE DADOS E LÓGICA (SUPABASE) ---
+    const STORAGE_KEY = 'agenda-gatinhos-v4';
+    const CONFIG_KEY = 'agenda-gatinhos-config-v2';
     const TABLE_NAME = 'agenda_items';
 
-    const SQL_SETUP = `create table if not exists public.agenda_items (
-  id uuid primary key default gen_random_uuid(),
-  couple_code text not null,
-  item_type text not null,
-  data jsonb not null default '{}'::jsonb,
-  done boolean not null default false,
-  created_by text,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-alter table public.agenda_items enable row level security;
-
--- Simples para projeto pessoal: permite que o site leia e grave usando anon key.
--- Não guarde dados sensíveis demais aqui. Use um código de sala difícil.
-drop policy if exists "agenda_public_read" on public.agenda_items;
-drop policy if exists "agenda_public_insert" on public.agenda_items;
-drop policy if exists "agenda_public_update" on public.agenda_items;
-drop policy if exists "agenda_public_delete" on public.agenda_items;
-
-create policy "agenda_public_read" on public.agenda_items for select using (true);
-create policy "agenda_public_insert" on public.agenda_items for insert with check (true);
-create policy "agenda_public_update" on public.agenda_items for update using (true) with check (true);
-create policy "agenda_public_delete" on public.agenda_items for delete using (true);
-
-alter publication supabase_realtime add table public.agenda_items;`;
+    const DEFAULT_SUPABASE_URL = 'https://tplpsaxxmbayfieeohbg.supabase.co';
+    const DEFAULT_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRwbHBzYXh4bWJheWZpZWVvaGJnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczOTMzNzIsImV4cCI6MjA5Mjk2OTM3Mn0.MyXZdaj2Ku-GwOUYcJeDEBi0fSG8V8HucuAm5kr1tuw';
+    const DEFAULT_COUPLE_CODE = 'gatinhos-2026';
+    const DEFAULT_USER_NAME = 'Casal';
 
     let state = loadState();
     let config = loadConfig();
@@ -574,446 +691,234 @@ alter publication supabase_realtime add table public.agenda_items;`;
     let realtimeChannel = null;
     let cloudReady = false;
 
-    const typeMap = {
-      expenses: 'expense',
-      reminders: 'reminder',
-      trainings: 'training',
-      notes: 'note',
-      shopping: 'shopping',
-      goals: 'goal'
-    };
-
+    const typeMap = { expenses: 'expense', incomes: 'income', reminders: 'reminder', trainings: 'training', notes: 'note', shopping: 'shopping', goals: 'goal', chat: 'chat', tictactoe: 'tictactoe' };
     const collectionByType = Object.fromEntries(Object.entries(typeMap).map(([k, v]) => [v, k]));
 
-    function emptyState() {
-      return { expenses: [], reminders: [], trainings: [], notes: [], shopping: [], goals: [] };
-    }
-
-    function loadState() {
-      try { return { ...emptyState(), ...(JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}) }; }
-      catch { return emptyState(); }
-    }
-
+    function emptyState() { return { expenses: [], incomes: [], reminders: [], trainings: [], notes: [], shopping: [], goals: [], chat: [], tictactoe: [] }; }
+    function loadState() { try { return { ...emptyState(), ...(JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}) }; } catch { return emptyState(); } }
     function loadConfig() {
-      try { return JSON.parse(localStorage.getItem(CONFIG_KEY)) || {}; }
-      catch { return {}; }
+      try { const saved = JSON.parse(localStorage.getItem(CONFIG_KEY)) || {}; return { userName: saved.userName || DEFAULT_USER_NAME, coupleCode: saved.coupleCode || DEFAULT_COUPLE_CODE, url: saved.url || DEFAULT_SUPABASE_URL, key: saved.key || DEFAULT_SUPABASE_KEY, tema: saved.tema || 'pink' }; } 
+      catch { return { userName: DEFAULT_USER_NAME, coupleCode: DEFAULT_COUPLE_CODE, url: DEFAULT_SUPABASE_URL, key: DEFAULT_SUPABASE_KEY, tema: 'pink' }; }
     }
-
-    function saveLocal() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      renderAll();
-    }
-
-    function saveConfig() {
-      localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
-    }
-
+    function saveLocal() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); renderAll(); }
+    function saveConfig() { localStorage.setItem(CONFIG_KEY, JSON.stringify(config)); }
     function id() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
     function money(value) { return Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
     function number(value) { return Number(value || 0); }
+    function formatDateTime(date, time) { if (!date && !time) return ''; const [y, m, d] = (date || '').split('-'); return `${y ? d+'/'+m+'/'+y : ''}${time ? ' às '+time : ''}`; }
 
-    function formatDateTime(date, time) {
-      if (!date && !time) return 'Sem data definida';
-      const [y, m, d] = (date || '').split('-');
-      const brDate = y ? `${d}/${m}/${y}` : 'Sem data';
-      return `${brDate}${time ? ' às ' + time : ''}`;
-    }
-
+    // Abas
     document.querySelectorAll('.tab-btn').forEach(button => {
       button.addEventListener('click', () => {
         document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
         document.querySelectorAll('.panel').forEach(panel => panel.classList.remove('active'));
         button.classList.add('active');
         document.getElementById(button.dataset.tab).classList.add('active');
+        if(button.dataset.tab === 'chat') setTimeout(scrollChat, 100);
       });
     });
 
+    function mudarTema() { config.tema = document.getElementById('cfgTema').value; saveConfig(); aplicarTema(); }
+    function aplicarTema() { document.documentElement.setAttribute('data-theme', config.tema); document.getElementById('cfgTema').value = config.tema; document.getElementById('themeMeta').content = config.tema === 'dark' ? '#121212' : (config.tema === 'blue' ? '#4ea8de' : '#ff7eb6'); }
+
+    function showToast(title, msg) {
+      const container = document.getElementById('toast-container');
+      const t = document.createElement('div'); t.className = 'toast';
+      t.innerHTML = `<strong>🔔 ${title}</strong><span>${msg}</span>`;
+      container.appendChild(t);
+      setTimeout(() => t.classList.add('show'), 10);
+      setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 400); }, 4000);
+    }
+
     async function initCloud() {
-      fillConfigInputs();
-      document.getElementById('sqlBox').textContent = SQL_SETUP;
-
-      if (!config.url || !config.key || !config.coupleCode) {
-        setSyncStatus('local', 'Modo local ativo', 'Configure o Supabase na aba ⚙️ para sincronizar entre vocês dois.');
-        renderAll();
-        return;
-      }
-
+      fillConfigInputs(); aplicarTema();
+      if (!config.url || !config.key || !config.coupleCode) { setSyncStatus('local', 'Modo local ativo', 'Configure o Supabase.'); renderAll(); return; }
       try {
         supabaseClient = window.supabase.createClient(config.url, config.key);
-        await loadCloudData();
-        subscribeRealtime();
-        cloudReady = true;
-        setSyncStatus('online', 'Online em tempo real', `Sala: ${config.coupleCode}. Tudo que vocês fizerem aparece nos dois celulares.`);
-      } catch (error) {
-        cloudReady = false;
-        setSyncStatus('error', 'Erro ao conectar', 'Confira URL, anon key, SQL e conexão com internet. Modo local continua funcionando.');
-        console.error(error);
-      }
+        await loadCloudData(); subscribeRealtime(); cloudReady = true;
+        setSyncStatus('online', 'Online em tempo real', `Sala conectada.`);
+      } catch (error) { cloudReady = false; setSyncStatus('error', 'Erro ao conectar', 'Falha na conexão.'); }
       renderAll();
     }
 
     function setSyncStatus(mode, title, text) {
       const dot = document.getElementById('syncDot');
       dot.className = 'sync-dot' + (mode === 'online' ? ' online' : mode === 'error' ? ' error' : '');
-      document.getElementById('syncTitle').textContent = title;
-      document.getElementById('syncText').textContent = text;
+      document.getElementById('syncTitle').textContent = title; document.getElementById('syncText').textContent = text;
     }
 
     async function loadCloudData() {
-      const { data, error } = await supabaseClient
-        .from(TABLE_NAME)
-        .select('*')
-        .eq('couple_code', config.coupleCode)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
+      const { data, error } = await supabaseClient.from(TABLE_NAME).select('*').eq('couple_code', config.coupleCode).order('created_at', { ascending: false });
+      if (error) return;
       state = emptyState();
-
       (data || []).forEach(row => {
+        if(row.item_type === 'kiss') return;
         const collection = collectionByType[row.item_type];
-        if (!collection) return;
-        state[collection].push({ ...row.data, id: row.id, done: row.done, createdAt: row.created_at, createdBy: row.created_by });
+        if (collection) state[collection].push({ ...row.data, id: row.id, done: row.done, createdAt: row.created_at, createdBy: row.created_by });
       });
-
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     }
 
     function subscribeRealtime() {
       if (realtimeChannel) supabaseClient.removeChannel(realtimeChannel);
-      realtimeChannel = supabaseClient
-        .channel('agenda-gatinhos-' + config.coupleCode)
-        .on('postgres_changes', { event: '*', schema: 'public', table: TABLE_NAME, filter: `couple_code=eq.${config.coupleCode}` }, async () => {
-          await loadCloudData();
-          renderAll();
-        })
-        .subscribe();
+      realtimeChannel = supabaseClient.channel('agenda-gatinhos-' + config.coupleCode)
+        .on('postgres_changes', { event: '*', schema: 'public', table: TABLE_NAME, filter: `couple_code=eq.${config.coupleCode}` }, async (payload) => {
+          if(payload.eventType === 'INSERT' && payload.new.created_by !== config.userName) {
+            if(payload.new.item_type === 'kiss') {
+               triggerHeartExplosion();
+               showToast(payload.new.created_by || "Seu amor", "Te mandou um beijo e está com saudade! 😘💖");
+               return; 
+            }
+            let acao = "Mexeu no app";
+            if(payload.new.item_type === 'chat') acao = "Mandou uma mensagem no Chat!";
+            if(payload.new.item_type === 'expense') acao = "Adicionou um gasto na Economia.";
+            if(payload.new.item_type === 'training') acao = "Registrou uma atividade esportiva!";
+            showToast(payload.new.created_by || "Seu amor", acao);
+          }
+          await loadCloudData(); renderAll();
+        }).subscribe();
+    }
+
+    async function sendKiss() {
+      triggerHeartExplosion(); 
+      if(!cloudReady) return showToast('Aviso', 'Fique online para enviar o beijo!');
+      await supabaseClient.from(TABLE_NAME).insert({ couple_code: config.coupleCode, item_type: 'kiss', data: {}, created_by: config.userName });
     }
 
     async function saveItem(collection, item) {
-      if (!cloudReady) {
-        state[collection].unshift(item);
-        saveLocal();
-        return;
-      }
-
-      const payload = {
-        couple_code: config.coupleCode,
-        item_type: typeMap[collection],
-        data: { ...item, id: undefined, done: undefined },
-        done: !!item.done,
-        created_by: config.userName || 'Casal'
-      };
-
-      const { error } = await supabaseClient.from(TABLE_NAME).insert(payload);
-      if (error) return alert('Erro ao salvar online: ' + error.message);
-      notify('Agenda dos Gatinhos', 'Novo item adicionado.');
-    }
-
-    async function updateDone(collection, itemId) {
-      const item = state[collection].find(x => x.id === itemId);
-      if (!item) return;
-      const newDone = !item.done;
-
-      if (!cloudReady) {
-        item.done = newDone;
-        saveLocal();
-        return;
-      }
-
-      const { error } = await supabaseClient.from(TABLE_NAME).update({ done: newDone, updated_at: new Date().toISOString() }).eq('id', itemId);
-      if (error) return alert('Erro ao atualizar: ' + error.message);
-    }
-
-    async function updateGoalValue(itemId, amount) {
-      const goal = state.goals.find(x => x.id === itemId);
-      if (!goal) return;
-      goal.current = number(goal.current) + amount;
-
-      if (!cloudReady) return saveLocal();
-
-      const { error } = await supabaseClient
-        .from(TABLE_NAME)
-        .update({ data: { ...goal, id: undefined, done: undefined }, done: number(goal.current) >= number(goal.target), updated_at: new Date().toISOString() })
-        .eq('id', itemId);
-
-      if (error) return alert('Erro ao atualizar meta: ' + error.message);
+      if (!cloudReady) { state[collection].unshift(item); saveLocal(); return; }
+      const payload = { couple_code: config.coupleCode, item_type: typeMap[collection], data: { ...item, id: undefined, done: undefined }, done: !!item.done, created_by: config.userName };
+      await supabaseClient.from(TABLE_NAME).insert(payload);
     }
 
     async function remove(collection, itemId) {
       if (!confirm('Quer apagar este item?')) return;
-
-      if (!cloudReady) {
-        const index = state[collection].findIndex(x => x.id === itemId);
-        if (index >= 0) state[collection].splice(index, 1);
-        saveLocal();
-        return;
-      }
-
-      const { error } = await supabaseClient.from(TABLE_NAME).delete().eq('id', itemId);
-      if (error) return alert('Erro ao apagar: ' + error.message);
+      if (!cloudReady) { const index = state[collection].findIndex(x => x.id === itemId); if (index >= 0) state[collection].splice(index, 1); saveLocal(); return; }
+      await supabaseClient.from(TABLE_NAME).delete().eq('id', itemId);
     }
 
+    async function updateDone(collection, itemId) {
+      const item = state[collection].find(x => x.id === itemId); if (!item) return;
+      if (!cloudReady) { item.done = !item.done; saveLocal(); return; }
+      await supabaseClient.from(TABLE_NAME).update({ done: !item.done }).eq('id', itemId);
+    }
+
+    // Função de atualizar o valor das Metas (que tinha sumido!)
+    async function updateGoalValue(itemId, amount) {
+      const goal = state.goals.find(x => x.id === itemId);
+      if (!goal) return;
+      goal.current = number(goal.current) + amount;
+      if (!cloudReady) return saveLocal();
+      await supabaseClient.from(TABLE_NAME).update({ data: { ...goal, id: undefined, done: undefined }, done: number(goal.current) >= number(goal.target) }).eq('id', itemId);
+    }
+
+    // --- FUNÇÕES DE RENDERIZAÇÃO ---
+    function saveIncomes() {
+      const eu = number(getValue('rendaEu')), ela = number(getValue('rendaEla'));
+      saveItem('incomes', { id: id(), eu, ela, createdAt: new Date().toISOString() });
+      showToast('Sucesso', 'Rendas do mês atualizadas!');
+    }
     function addExpense() {
-      const item = getValue('expenseItem');
-      const desc = getValue('expenseDesc');
-      const value = number(getValue('expenseValue'));
-      const person = getValue('expensePerson');
-      const category = getValue('expenseCategory');
-      if (!item || !value) return alert('Preencha o item e o valor do gasto.');
-      clearFields('expenseItem', 'expenseDesc', 'expenseValue');
-      saveItem('expenses', { id: id(), item, desc, value, person, category, done: false, createdAt: new Date().toISOString() });
+      const item = getValue('expenseItem'), value = number(getValue('expenseValue')), category = getValue('expenseCategory');
+      if (!item || !value) return alert('Preencha o item e o valor.');
+      clearFields('expenseItem', 'expenseValue');
+      saveItem('expenses', { id: id(), item, value, category, done: false, createdAt: new Date().toISOString() });
+    }
+    function renderEconomy() {
+      const latestIncome = state.incomes.sort((a,b) => b.createdAt.localeCompare(a.createdAt))[0] || { eu: 0, ela: 0 };
+      document.getElementById('rendaEu').value = latestIncome.eu || ''; document.getElementById('rendaEla').value = latestIncome.ela || '';
+      const totalIncome = number(latestIncome.eu) + number(latestIncome.ela);
+      const totalExpenses = state.expenses.reduce((sum, e) => sum + number(e.value), 0);
+      const sobra = totalIncome - totalExpenses;
+      document.getElementById('ecoTotalIncome').innerText = money(totalIncome); document.getElementById('ecoTotalExpense').innerText = money(totalExpenses); document.getElementById('ecoSobra').innerText = money(sobra);
+      document.getElementById('expenseList').innerHTML = state.expenses.map(e => `
+        <div class="item"><div><div class="title">${escapeHtml(e.item)}</div><div class="meta">${escapeHtml(e.category)} • Por: ${e.createdBy || 'Alguém'}</div></div>
+        <div style="display:flex; align-items:center; gap: 15px;"><strong>${money(e.value)}</strong><button class="mini" onclick="remove('expenses', '${e.id}')">🗑️</button></div></div>`).join('') || '<div class="empty">Nenhum gasto.</div>';
+      document.getElementById('dashSobra').innerText = money(sobra); document.getElementById('chipTotal').textContent = `Gastos: ${money(totalExpenses)}`; document.getElementById('chipRenda').textContent = `Renda: ${money(totalIncome)}`;
     }
 
-    function addShopping() {
-      const item = getValue('shopItem');
-      const qty = getValue('shopQty') || '1';
-      const category = getValue('shopCategory');
-      const estimate = number(getValue('shopEstimate'));
-      if (!item) return alert('Escreva o produto.');
-      clearFields('shopItem', 'shopQty', 'shopEstimate');
-      saveItem('shopping', { id: id(), item, qty, category, estimate, done: false, createdAt: new Date().toISOString() });
+    function sendChat() { const text = getValue('chatInput'); if(!text) return; saveItem('chat', { id: id(), text, createdAt: new Date().toISOString() }); document.getElementById('chatInput').value = ''; }
+    function renderChat() {
+      document.getElementById('chatMessages').innerHTML = [...state.chat].reverse().map(c => `<div class="msg ${c.createdBy === config.userName ? 'me' : 'them'}"><span class="msg-name">${c.createdBy || 'Alguém'}</span>${escapeHtml(c.text)}</div>`).join('') || '<div class="empty">Nenhuma mensagem.</div>';
     }
+    function scrollChat() { const box = document.getElementById('chatMessages'); box.scrollTop = box.scrollHeight; }
 
-    function addReminder() {
-      const title = getValue('reminderTitle');
-      const desc = getValue('reminderDesc');
-      const date = getValue('reminderDate');
-      const time = getValue('reminderTime');
-      const priority = getValue('reminderPriority');
-      if (!title) return alert('Dê um título para o lembrete.');
-      clearFields('reminderTitle', 'reminderDesc', 'reminderDate', 'reminderTime');
-      saveItem('reminders', { id: id(), title, desc, date, time, priority, done: false, createdAt: new Date().toISOString() });
-      notify('Novo lembrete criado', title);
-    }
-
-    function addTraining() {
-      const title = getValue('trainingTitle');
-      const desc = getValue('trainingDesc');
-      const date = getValue('trainingDate');
-      const time = getValue('trainingTime');
-      const color = getValue('trainingColor');
-      if (!title) return alert('Dê um nome para o treino.');
-      clearFields('trainingTitle', 'trainingDesc', 'trainingDate', 'trainingTime');
-      saveItem('trainings', { id: id(), title, desc, date, time, color, done: false, createdAt: new Date().toISOString() });
-      notify('Novo treino marcado', title);
-    }
-
-    function addGoal() {
-      const title = getValue('goalTitle');
-      const category = getValue('goalCategory');
-      const current = number(getValue('goalCurrent'));
-      const target = number(getValue('goalTarget'));
-      const desc = getValue('goalDesc');
-      if (!title || !target) return alert('Preencha a meta e o objetivo.');
-      clearFields('goalTitle', 'goalCurrent', 'goalTarget', 'goalDesc');
-      saveItem('goals', { id: id(), title, category, current, target, desc, done: current >= target, createdAt: new Date().toISOString() });
-    }
-
-    function addNote() {
-      const title = getValue('noteTitle');
-      const text = getValue('noteText');
-      const color = getValue('noteColor');
-      if (!title && !text) return alert('Escreva pelo menos um título ou texto.');
-      clearFields('noteTitle', 'noteText');
-      saveItem('notes', { id: id(), title: title || 'Anotação sem título', text, color, done: false, createdAt: new Date().toISOString() });
-    }
-
-    function quickTraining(title, desc) {
-      document.getElementById('trainingTitle').value = title;
-      document.getElementById('trainingDesc').value = desc;
-    }
-
-    function renderExpenses() {
-      const list = document.getElementById('expenseList');
-      const total = state.expenses.reduce((sum, e) => sum + number(e.value), 0);
-      const byPerson = groupSum(state.expenses, 'person', 'value');
-      const eu = byPerson['Eu'] || 0;
-      const namorada = byPerson['Namorada'] || 0;
-      const half = total / 2;
-      const diff = Math.abs(eu - namorada) / 2;
-      const payer = eu > namorada ? 'Namorada' : eu < namorada ? 'Eu' : '';
-
-      document.getElementById('expenseTotal').textContent = money(total);
-      document.getElementById('expenseByPerson').innerHTML = Object.entries(byPerson).map(([p, v]) => `<span class="chip">${escapeHtml(p)}: ${money(v)}</span>`).join('') || '<span class="chip">Nenhum gasto ainda</span>';
-      document.getElementById('splitInfo').textContent = !total ? 'Sem gastos ainda.' : payer ? `Total dividido: ${money(half)} para cada. Para equilibrar, ${payer} deveria compensar ${money(diff)}.` : `Tudo equilibrado. Cada um ficou com ${money(half)}.`;
-
-      list.innerHTML = state.expenses.map(e => `
-        <div class="item">
-          <div><div class="title">${escapeHtml(e.item)} — ${money(e.value)}</div><div class="meta">${escapeHtml(e.category || 'Outro')} • ${escapeHtml(e.desc || 'Sem descrição')} • Pago por: ${escapeHtml(e.person || 'Não informado')}</div></div>
-          <div class="actions"><button class="mini" onclick="remove('expenses', '${e.id}')">🗑️</button></div>
-        </div>`).join('') || '<div class="empty">Nenhum gasto cadastrado ainda.</div>';
-    }
-
-    function renderShopping() {
-      const list = document.getElementById('shoppingList');
-      const pending = state.shopping.filter(x => !x.done);
-      const estimate = pending.reduce((s, x) => s + number(x.estimate), 0);
-      document.getElementById('shoppingSummary').innerHTML = `<span class="chip">Pendentes: ${pending.length}</span><span class="chip">Estimativa: ${money(estimate)}</span>`;
-      list.innerHTML = state.shopping.map(x => `
-        <div class="item ${x.done ? 'done' : ''}">
-          <div><div class="title">${escapeHtml(x.item)} ${x.qty ? '× ' + escapeHtml(x.qty) : ''}</div><div class="meta">${escapeHtml(x.category || 'Outro')} • Estimativa: ${money(x.estimate)}</div></div>
-          <div class="actions"><button class="mini" onclick="updateDone('shopping', '${x.id}')">${x.done ? '↩️' : '✅'}</button><button class="mini" onclick="remove('shopping', '${x.id}')">🗑️</button></div>
-        </div>`).join('') || '<div class="empty">Nenhum item de compra ainda.</div>';
-    }
-
-    function renderReminders() {
-      const list = document.getElementById('reminderList');
-      list.innerHTML = state.reminders.map(r => `
-        <div class="item ${r.done ? 'done' : ''}">
-          <div><div class="title">${escapeHtml(r.title)}</div><div class="meta">${formatDateTime(r.date, r.time)} • Prioridade: ${escapeHtml(r.priority)}</div><div class="meta">${escapeHtml(r.desc || '')}</div></div>
-          <div class="actions"><button class="mini" onclick="updateDone('reminders', '${r.id}')">${r.done ? '↩️' : '✅'}</button><button class="mini" onclick="remove('reminders', '${r.id}')">🗑️</button></div>
-        </div>`).join('') || '<div class="empty">Nenhum lembrete cadastrado ainda.</div>';
-    }
-
-    function renderTrainings() {
-      const list = document.getElementById('trainingList');
-      list.innerHTML = state.trainings.map((t, i) => `
+    // TREINOS (Agora com o botão de checklist!)
+    function addTraining() { const type = getValue('trainingType'), desc = getValue('trainingDesc'), date = getValue('trainingDate'), color = getValue('trainingColor'); if (!type) return; clearFields('trainingDesc', 'trainingDate'); saveItem('trainings', { id: id(), type, desc, date, color, done: false, createdAt: new Date().toISOString() }); }
+    function renderTrainings() { 
+      document.getElementById('trainingList').innerHTML = state.trainings.map((t, i) => `
         <div class="postit ${t.color || 'pink'} ${t.done ? 'done' : ''}" style="--rot:${i % 2 === 0 ? '-1.4deg' : '1.2deg'}">
-          <div class="title">${escapeHtml(t.title)}</div><div class="meta">${formatDateTime(t.date, t.time)}</div><p class="note-content">${escapeHtml(t.desc || 'Sem descrição.')}</p>
-          <div class="actions"><button class="mini" onclick="updateDone('trainings', '${t.id}')">${t.done ? '↩️ Reabrir' : '✅ Feito'}</button><button class="mini" onclick="remove('trainings', '${t.id}')">🗑️</button></div>
-        </div>`).join('') || '<div class="empty">Nenhum treino cadastrado ainda.</div>';
+          <div class="title">${escapeHtml(t.type)}</div><div class="meta">${formatDateTime(t.date)}</div><p class="note-content">${escapeHtml(t.desc || '')}</p>
+          <div class="actions">
+            <button class="mini" onclick="updateDone('trainings', '${t.id}')">${t.done ? '↩️ Reabrir' : '✅ Feito'}</button>
+            <button class="mini" onclick="remove('trainings', '${t.id}')">🗑️</button>
+          </div>
+        </div>`).join('') || '<div class="empty">Nenhum esporte registrado.</div>'; 
     }
 
-    function renderGoals() {
-      const list = document.getElementById('goalList');
-      list.innerHTML = state.goals.map(g => {
+    async function playTicTacToe(index) {
+      let game = state.tictactoe.sort((a,b) => b.createdAt.localeCompare(a.createdAt))[0];
+      let board = game ? game.board : Array(9).fill(''); let turn = game ? game.turn : 'X';
+      if(board[index] !== '') return; board[index] = turn;
+      saveItem('tictactoe', { id: id(), board, turn: turn === 'X' ? 'O' : 'X', createdAt: new Date().toISOString() });
+    }
+    function resetTicTacToe() { saveItem('tictactoe', { id: id(), board: Array(9).fill(''), turn: 'X', createdAt: new Date().toISOString() }); }
+    function renderTicTacToe() {
+      let game = state.tictactoe.sort((a,b) => b.createdAt.localeCompare(a.createdAt))[0];
+      let board = game ? game.board : Array(9).fill(''); let turn = game ? game.turn : 'X';
+      const cells = document.querySelectorAll('.cell'); board.forEach((val, i) => cells[i].innerText = val);
+      document.getElementById('gameStatus').innerText = board.every(x => x === '') ? "Comecem o Jogo!" : `Vez do: ${turn}`;
+    }
+
+    function addShopping() { const item = getValue('shopItem'); if (!item) return; saveItem('shopping', { id: id(), item, qty: getValue('shopQty'), estimate: number(getValue('shopEstimate')), done: false, createdAt: new Date().toISOString() }); clearFields('shopItem', 'shopQty', 'shopEstimate'); }
+    function renderShopping() { document.getElementById('shoppingList').innerHTML = state.shopping.map(x => `<div class="item ${x.done ? 'done' : ''}"><div><div class="title">${escapeHtml(x.item)} ${x.qty ? '× '+escapeHtml(x.qty) : ''}</div></div><div class="actions"><button class="mini" onclick="updateDone('shopping', '${x.id}')">${x.done ? '↩️' : '✅'}</button><button class="mini" onclick="remove('shopping', '${x.id}')">🗑️</button></div></div>`).join('') || '<div class="empty">Nenhuma compra pendente.</div>'; }
+
+    function addReminder() { const title = getValue('reminderTitle'); if (!title) return; saveItem('reminders', { id: id(), title, done: false, createdAt: new Date().toISOString() }); clearFields('reminderTitle'); }
+    function renderReminders() { document.getElementById('reminderList').innerHTML = state.reminders.map(r => `<div class="item ${r.done ? 'done' : ''}"><div><div class="title">${escapeHtml(r.title)}</div></div><div class="actions"><button class="mini" onclick="updateDone('reminders', '${r.id}')">${r.done ? '↩️' : '✅'}</button><button class="mini" onclick="remove('reminders', '${r.id}')">🗑️</button></div></div>`).join('') || '<div class="empty">Nenhum lembrete.</div>'; }
+
+    // METAS (Restaurada com a barra de progresso e botões de +10 e +50!)
+    function addGoal() { const title = getValue('goalTitle'); if (!title) return; saveItem('goals', { id: id(), title, current: number(getValue('goalCurrent')), target: number(getValue('goalTarget')), done: false, createdAt: new Date().toISOString() }); clearFields('goalTitle', 'goalCurrent', 'goalTarget'); }
+    function renderGoals() { 
+      document.getElementById('goalList').innerHTML = state.goals.map(g => {
         const percent = g.target ? Math.min(100, Math.round((number(g.current) / number(g.target)) * 100)) : 0;
-        return `<div class="item ${percent >= 100 ? 'done' : ''}">
-          <div><div class="title">${escapeHtml(g.title)} — ${percent}%</div><div class="meta">${escapeHtml(g.category || 'Outro')} • ${escapeHtml(g.desc || '')}</div><div class="meta">${money(g.current)} de ${money(g.target)}</div><div class="progress-wrap"><div class="progress" style="width:${percent}%"></div></div></div>
-          <div class="actions"><button class="mini" onclick="updateGoalValue('${g.id}', 10)">+10</button><button class="mini" onclick="updateGoalValue('${g.id}', 50)">+50</button><button class="mini" onclick="remove('goals', '${g.id}')">🗑️</button></div>
+        return `
+        <div class="item ${percent >= 100 ? 'done' : ''}">
+          <div style="width: 100%;">
+            <div class="title">${escapeHtml(g.title)} — ${percent}%</div>
+            <div class="meta">${money(g.current)} de ${money(g.target)}</div>
+            <div class="progress-wrap"><div class="progress" style="width:${percent}%"></div></div>
+          </div>
+          <div class="actions">
+            <button class="mini" onclick="updateGoalValue('${g.id}', 10)">+10</button>
+            <button class="mini" onclick="updateGoalValue('${g.id}', 50)">+50</button>
+            <button class="mini" onclick="remove('goals', '${g.id}')">🗑️</button>
+          </div>
         </div>`;
-      }).join('') || '<div class="empty">Nenhuma meta criada ainda.</div>';
+      }).join('') || '<div class="empty">Nenhuma meta.</div>'; 
     }
 
-    function renderNotes() {
-      const list = document.getElementById('noteList');
-      list.innerHTML = state.notes.map((n, i) => `
-        <div class="postit ${n.color || 'yellow'}" style="--rot:${i % 2 === 0 ? '-1deg' : '1.3deg'}">
-          <div class="title">${escapeHtml(n.title)}</div><p class="note-content">${escapeHtml(n.text || '')}</p>
-          <div class="actions"><button class="mini" onclick="remove('notes', '${n.id}')">🗑️</button></div>
-        </div>`).join('') || '<div class="empty">Nenhuma anotação ainda.</div>';
-    }
-
-    function renderDashboard() {
-      const total = state.expenses.reduce((s, e) => s + number(e.value), 0);
-      const pendingReminders = state.reminders.filter(x => !x.done).length;
-      const pendingTrainings = state.trainings.filter(x => !x.done).length;
-      const doneTrainings = state.trainings.filter(x => x.done).length;
-      const pendingShopping = state.shopping.filter(x => !x.done).length;
-      const doneGoals = state.goals.filter(g => number(g.current) >= number(g.target)).length;
-      const trainingPercent = state.trainings.length ? Math.round((doneTrainings / state.trainings.length) * 100) : 0;
-
-      document.getElementById('dashTotal').textContent = money(total);
-      document.getElementById('dashFinanceChips').innerHTML = Object.entries(groupSum(state.expenses, 'category', 'value')).slice(0, 6).map(([k, v]) => `<span class="chip">${escapeHtml(k)}: ${money(v)}</span>`).join('') || '<span class="chip">Sem gastos</span>';
-      document.getElementById('chipTotal').textContent = `Total gasto: ${money(total)}`;
-      document.getElementById('chipPendentes').textContent = `Lembretes: ${pendingReminders}`;
-      document.getElementById('chipTreinos').textContent = `Treinos: ${pendingTrainings}`;
-      document.getElementById('chipCompras').textContent = `Compras: ${pendingShopping}`;
-      document.getElementById('chipMetas').textContent = `Metas completas: ${doneGoals}/${state.goals.length}`;
-      document.getElementById('chipNotas').textContent = `Notas: ${state.notes.length}`;
-      document.getElementById('trainingProgress').style.width = `${trainingPercent}%`;
-      document.getElementById('trainingProgressText').textContent = `${trainingPercent}% concluído`;
-      document.getElementById('quickStats').innerHTML = `<span class="chip green">Feitos: ${doneTrainings}</span><span class="chip red">Pendentes: ${pendingTrainings}</span><span class="chip blue">Total: ${state.trainings.length}</span>`;
-
-      const upcoming = [
-        ...state.reminders.filter(x => !x.done).map(x => ({...x, type: 'Lembrete'})),
-        ...state.trainings.filter(x => !x.done).map(x => ({...x, type: 'Treino'}))
-      ].sort((a, b) => `${a.date || '9999-99-99'} ${a.time || '99:99'}`.localeCompare(`${b.date || '9999-99-99'} ${b.time || '99:99'}`)).slice(0, 5);
-
-      document.getElementById('upcomingList').innerHTML = upcoming.map(i => `<div class="item"><div><div class="title">${i.type}: ${escapeHtml(i.title)}</div><div class="meta">${formatDateTime(i.date, i.time)}</div></div></div>`).join('') || '<div class="empty">Nada pendente por enquanto. Paz dos gatinhos ativada.</div>';
-    }
+    function addNote() { const text = getValue('noteText'); const title = getValue('noteTitle'); if(!text && !title) return; saveItem('notes', { id: id(), title, text, color: getValue('noteColor'), createdAt: new Date().toISOString() }); clearFields('noteText', 'noteTitle'); }
+    function renderNotes() { document.getElementById('noteList').innerHTML = state.notes.map((n, i) => `<div class="postit ${n.color || 'yellow'}" style="--rot:${i % 2 === 0 ? '-1deg' : '1.3deg'}"><div class="title">${escapeHtml(n.title)}</div><p class="note-content">${escapeHtml(n.text || '')}</p><div class="actions"><button class="mini" onclick="remove('notes', '${n.id}')">🗑️</button></div></div>`).join('') || '<div class="empty">Nenhuma anotação.</div>'; }
 
     function renderAll() {
-      renderExpenses(); renderShopping(); renderReminders(); renderTrainings(); renderGoals(); renderNotes(); renderDashboard(); fillConfigInputs();
-    }
+      renderEconomy(); renderChat(); renderTrainings(); renderTicTacToe(); renderShopping(); renderReminders(); renderGoals(); renderNotes();
+      
+      const doneTrainings = state.trainings.filter(x => x.done).length;
+      const trainingPercent = state.trainings.length ? Math.round((doneTrainings / state.trainings.length) * 100) : 0;
+      
+      document.getElementById('trainingProgress').style.width = `${trainingPercent}%`;
+      document.getElementById('trainingProgressText').textContent = `${trainingPercent}% concluído`;
 
-    function groupSum(items, key, valueKey) {
-      return items.reduce((acc, item) => {
-        const name = item[key] || 'Outro';
-        acc[name] = (acc[name] || 0) + number(item[valueKey]);
-        return acc;
-      }, {});
+      document.getElementById('chipPendentes').textContent = `Lembretes: ${state.reminders.filter(x => !x.done).length}`;
+      document.getElementById('chipTreinos').textContent = `Esportes feitos: ${doneTrainings}/${state.trainings.length}`;
+      document.getElementById('chipCompras').textContent = `Compras: ${state.shopping.filter(x => !x.done).length}`;
     }
 
     function getValue(id) { return document.getElementById(id).value.trim(); }
     function clearFields(...ids) { ids.forEach(id => document.getElementById(id).value = ''); }
-
-    function fillConfigInputs() {
-      document.getElementById('cfgUserName').value = config.userName || '';
-      document.getElementById('cfgCoupleCode').value = config.coupleCode || '';
-      document.getElementById('cfgUrl').value = config.url || '';
-      document.getElementById('cfgKey').value = config.key || '';
-    }
-
-    function saveConfigAndConnect() {
-      config = {
-        userName: getValue('cfgUserName'),
-        coupleCode: getValue('cfgCoupleCode'),
-        url: getValue('cfgUrl'),
-        key: getValue('cfgKey')
-      };
-      if (!config.coupleCode || !config.url || !config.key) return alert('Preencha código da sala, URL e anon key.');
-      saveConfig();
-      initCloud();
-    }
-
-    function disconnectCloud() {
-      config = {};
-      saveConfig();
-      cloudReady = false;
-      if (realtimeChannel && supabaseClient) supabaseClient.removeChannel(realtimeChannel);
-      setSyncStatus('local', 'Modo local ativo', 'Dados salvos só neste aparelho.');
-      renderAll();
-    }
-
-    function clearAllLocal() {
-      if (!confirm('Isso apaga apenas o backup local deste aparelho. Continuar?')) return;
-      localStorage.removeItem(STORAGE_KEY);
-      state = emptyState();
-      renderAll();
-    }
-
-    function askNotificationPermission() {
-      if (!('Notification' in window)) return alert('Este navegador não suporta notificações.');
-      Notification.requestPermission().then(permission => alert(permission === 'granted' ? 'Notificações ativadas!' : 'Permissão negada.'));
-    }
-
-    function notify(title, body) {
-      if ('Notification' in window && Notification.permission === 'granted') new Notification(title, { body });
-    }
-
-    function exportData() {
-      const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'backup-agenda-gatinhos.json';
-      a.click();
-      URL.revokeObjectURL(url);
-    }
-
-    function importData(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        try {
-          const imported = JSON.parse(reader.result);
-          state = { ...emptyState(), ...imported };
-          saveLocal();
-          alert('Backup importado com sucesso!');
-        } catch { alert('Arquivo inválido.'); }
-      };
-      reader.readAsText(file);
-    }
-
-    function copySql() {
-      navigator.clipboard.writeText(SQL_SETUP).then(() => alert('SQL copiado!'));
-    }
-
-    function escapeHtml(text) {
-      return String(text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
-    }
+    function fillConfigInputs() { document.getElementById('cfgUserName').value = config.userName || ''; document.getElementById('cfgCoupleCode').value = config.coupleCode || ''; document.getElementById('cfgUrl').value = config.url || ''; document.getElementById('cfgKey').value = config.key || ''; document.getElementById('cfgTema').value = config.tema || 'pink'; }
+    function saveConfigAndConnect() { config = { userName: getValue('cfgUserName') || 'Amor', coupleCode: getValue('cfgCoupleCode'), url: getValue('cfgUrl'), key: getValue('cfgKey'), tema: getValue('cfgTema') }; if (!config.coupleCode || !config.url || !config.key) return alert('Preencha código da sala, URL e anon key.'); saveConfig(); aplicarTema(); showToast('Configurações', 'Salvo com sucesso!'); initCloud(); }
+    function escapeHtml(text) { return String(text || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 
     initCloud();
   </script>
