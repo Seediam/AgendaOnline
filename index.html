@@ -3,299 +3,137 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" content="#f7d9cf" />
+  <meta name="theme-color" content="#df8f7c" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Nosso Tempo" />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" href="icon.svg" type="image/svg+xml" />
-  <title>Nosso Tempo — Calendário Compartilhado</title>
+  <title>Nosso Tempo — Vida Compartilhada</title>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div id="toast" class="toast" aria-live="polite"></div>
 
-  <section id="authScreen" class="screen auth-screen hidden">
+  <section id="authScreen" class="screen hidden">
     <div class="auth-card">
       <div class="brand-mark">♡</div>
-      <p class="eyebrow">CALENDÁRIO COMPARTILHADO</p>
+      <p class="eyebrow">NOSSO ESPAÇO</p>
       <h1>Nosso Tempo</h1>
-      <p class="muted">
-        Um lugar para transformar “a gente precisa fazer” em dias realmente vividos juntos.
-      </p>
-
-      <div class="tabs">
-        <button class="tab active" data-auth-tab="login">Entrar</button>
-        <button class="tab" data-auth-tab="signup">Criar conta</button>
-      </div>
-
-      <form id="authForm" class="stack">
-        <label>
-          E-mail
-          <input id="authEmail" type="email" autocomplete="email" required placeholder="voce@email.com" />
-        </label>
-        <label>
-          Senha
-          <input id="authPassword" type="password" minlength="6" required placeholder="mínimo 6 caracteres" />
-        </label>
-        <button id="authSubmit" class="btn primary" type="submit">Entrar</button>
-      </form>
+      <p class="muted">Calendário, rotina, casa, pets e planos em um só lugar.</p>
+      <div class="tabs"><button class="tab active" data-auth-tab="login">Entrar</button><button class="tab" data-auth-tab="signup">Criar conta</button></div>
+      <form id="authForm" class="stack"><label>E-mail<input id="authEmail" type="email" autocomplete="email" required /></label><label>Senha<input id="authPassword" type="password" minlength="6" required /></label><button id="authSubmit" class="btn primary" type="submit">Entrar</button></form>
       <p id="authHint" class="tiny muted"></p>
     </div>
   </section>
 
-  <section id="boardScreen" class="screen board-screen hidden">
+  <section id="boardScreen" class="screen hidden">
     <div class="auth-card wide">
-      <div class="brand-mark">♡</div>
-      <p class="eyebrow">PRIMEIRO PASSO</p>
-      <h1>Crie ou entre na agenda</h1>
-      <p class="muted">Uma pessoa cria. A outra entra usando o código de convite.</p>
-
+      <div class="brand-mark">♡</div><p class="eyebrow">AGENDA COMPARTILHADA</p><h1>Escolha seu espaço</h1><p class="muted">Uma pessoa cria e a outra entra usando o código.</p>
       <div class="two-col">
-        <form id="createBoardForm" class="panel stack">
-          <h3>Criar nova agenda</h3>
-          <label>
-            Nome da agenda
-            <input id="boardName" maxlength="60" value="Nosso Tempo" required />
-          </label>
-          <label>
-            Seu nome
-            <input id="creatorName" maxlength="40" placeholder="Ex.: Nathalia" required />
-          </label>
-          <button class="btn primary" type="submit">Criar agenda</button>
-        </form>
-
-        <form id="joinBoardForm" class="panel stack">
-          <h3>Entrar com convite</h3>
-          <label>
-            Código
-            <input id="joinCode" maxlength="12" placeholder="Ex.: A1B2C3D4" required />
-          </label>
-          <label>
-            Seu nome
-            <input id="joinName" maxlength="40" placeholder="Como quer aparecer" required />
-          </label>
-          <button class="btn secondary" type="submit">Entrar na agenda</button>
-        </form>
+        <form id="createBoardForm" class="panel stack"><h3>Criar nova agenda</h3><label>Nome da agenda<input id="boardName" maxlength="60" value="Nosso Tempo" required /></label><label>Seu nome<input id="creatorName" maxlength="40" placeholder="Ex.: Nat" required /></label><button class="btn primary" type="submit">Criar agenda</button></form>
+        <form id="joinBoardForm" class="panel stack"><h3>Entrar com convite</h3><label>Código<input id="joinCode" maxlength="12" placeholder="Ex.: A1B2C3D4" required /></label><label>Seu nome<input id="joinName" maxlength="40" required /></label><button class="btn secondary" type="submit">Entrar na agenda</button></form>
       </div>
-
-      <div id="existingBoards" class="existing-boards"></div>
-      <button id="boardLogout" class="link-btn" type="button">Sair da conta</button>
+      <div id="existingBoards" class="existing-boards"></div><button id="boardLogout" class="link-btn" type="button">Sair da conta</button>
     </div>
   </section>
 
   <main id="app" class="app hidden">
     <header class="topbar">
-      <div>
-        <div class="brand-line">
-          <span class="mini-heart">♡</span>
-          <div>
-            <p class="eyebrow">NOSSO CALENDÁRIO</p>
-            <h1 id="appTitle">Nosso Tempo</h1>
-          </div>
-        </div>
-        <p class="subtitle">tempo de qualidade • rotina • cuidado • movimento</p>
-      </div>
-
-      <div class="top-actions">
-        <button id="themeButton" class="icon-btn" title="Trocar cores">🎨</button>
-        <button id="notifyButton" class="icon-btn" title="Ativar lembretes">🔔</button>
-        <button id="menuButton" class="icon-btn" title="Opções">⋯</button>
-      </div>
+      <div class="brand-line"><span class="mini-heart">♡</span><div><p class="eyebrow">NOSSO ESPAÇO</p><h1 id="appTitle">Nosso Tempo</h1><p class="subtitle">tempo • casa • cuidado • planos</p></div></div>
+      <div class="top-actions"><button id="themeButton" class="icon-btn" title="Cores">🎨</button><button id="notifyButton" class="icon-btn notify-icon" title="Recados">🔔<span id="noticeBadge" class="notice-badge hidden">0</span></button><button id="menuButton" class="icon-btn" title="Opções">⋯</button></div>
     </header>
 
-    <section id="demoBanner" class="demo-banner hidden">
-      <strong>Modo demonstração local.</strong>
-      Você já pode testar tudo. Para sincronizar entre duas pessoas, configure o Supabase seguindo o README.
+    <nav id="appNav" class="app-nav" aria-label="Páginas">
+      <button class="nav-item active" data-page="calendar"><span>📅</span><small>Calendário</small></button>
+      <button class="nav-item" data-page="tasks"><span>✅</span><small>Checklist</small></button>
+      <button class="nav-item" data-page="finance"><span>💰</span><small>Banquinho</small></button>
+      <button class="nav-item" data-page="pets"><span>🐾</span><small>Pets</small></button>
+      <button class="nav-item" data-page="notices"><span>💌</span><small>Recados</small></button>
+      <button class="nav-item" data-page="summary"><span>📊</span><small>Resumo</small></button>
+      <button class="nav-item" data-page="profile"><span>👤</span><small>Perfil</small></button>
+    </nav>
+
+    <section id="demoBanner" class="demo-banner hidden"><strong>Modo demonstração.</strong> Os dados ficam apenas neste navegador.</section>
+
+    <section class="app-page active" data-app-page="calendar">
+      <section class="hero-grid compact-hero">
+        <article class="weather-card"><div class="weather-icon" id="todayWeatherIcon">⛅</div><div><p class="eyebrow">CASCATINHA • PETRÓPOLIS</p><h2 id="todayWeatherTitle">Carregando clima...</h2><p id="todayWeatherText" class="muted">Previsão para organizar o dia.</p></div></article>
+        <article class="invite-card"><p class="eyebrow">CÓDIGO DA AGENDA</p><div class="invite-row"><strong id="inviteCode">LOCAL</strong><button id="copyInvite" class="small-btn">Copiar</button></div><p class="tiny muted">Compartilhe somente com quem participa.</p></article>
+        <article class="quick-stat-card"><p class="eyebrow">PERÍODO</p><strong id="calendarQuickStat">0 realizados • 0 pendentes</strong><small id="calendarQuickSub" class="muted">Acompanhem sem transformar rotina em cobrança.</small></article>
+      </section>
+      <section class="controls"><div class="date-control"><label>Início <input id="startDate" type="date" /></label><span>até</span><label>Fim <input id="endDate" type="date" /></label><button id="applyRange" class="btn secondary compact">Atualizar</button></div><div class="legend"><span><i class="dot good"></i> tempo bom</span><span><i class="dot bad"></i> tempo ruim</span><span><i class="dot done"></i> realizado</span><span><i class="dot missed"></i> não realizado</span><span><i class="dot unexpected"></i> imprevisto</span></div></section>
+      <section class="mobile-calendar-toolbar"><button id="prevPeriod" class="calendar-nav-btn">‹</button><button id="todayButton" class="calendar-today-btn">Hoje</button><div class="mobile-range-copy"><strong id="mobileRangeTitle">Período</strong><small id="mobileRangeSubtitle">toque em um dia</small></div><button id="nextPeriod" class="calendar-nav-btn">›</button></section>
+      <section class="calendar-shell"><div class="weekday-row"><span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span><span>Dom</span></div><div id="calendarGrid" class="calendar-grid"></div></section>
+      <button id="mobileFab" class="mobile-fab" type="button" aria-label="Adicionar">+</button>
     </section>
 
-    <section class="hero-grid">
-      <article class="quote-card">
-        <span class="quote-mark">“</span>
-        <p>
-          Quando a gente vive coisas juntos, o tempo solo deixa de parecer distância
-          e passa a ser só espaço.
-        </p>
-        <small>um dia de cada vez ♡</small>
-      </article>
-
-      <article class="weather-card">
-        <div class="weather-icon" id="todayWeatherIcon">⛅</div>
-        <div>
-          <p class="eyebrow">CASCATINHA • PETRÓPOLIS</p>
-          <h2 id="todayWeatherTitle">Carregando clima...</h2>
-          <p id="todayWeatherText" class="muted">Previsão para organizar o dia.</p>
-        </div>
-      </article>
-
-      <article class="invite-card">
-        <p class="eyebrow">CÓDIGO DA AGENDA</p>
-        <div class="invite-row">
-          <strong id="inviteCode">LOCAL</strong>
-          <button id="copyInvite" class="small-btn">Copiar</button>
-        </div>
-        <p class="tiny muted">Compartilhe apenas com a pessoa que vai editar com você.</p>
-      </article>
+    <section class="app-page" data-app-page="tasks">
+      <div class="page-head"><div><p class="eyebrow">CHECKLIST COMPARTILHADA</p><h2>Coisas que precisam acontecer</h2><p class="muted">Casa, compras, burocracias e qualquer tarefa que vocês não querem deixar passar.</p></div><button id="newTaskButton" class="btn primary">+ Nova tarefa</button></div>
+      <div id="taskSummaryCards" class="metric-grid"></div><div class="filter-row"><button class="filter-chip active" data-task-filter="all">Todas</button><button class="filter-chip" data-task-filter="today">Hoje</button><button class="filter-chip" data-task-filter="missed">Não realizadas</button><button class="filter-chip" data-task-filter="done">Realizadas</button><button class="filter-chip" data-task-filter="unexpected">Imprevistos</button></div><div id="taskList" class="content-list"></div>
     </section>
 
-    <section class="controls">
-      <div class="date-control">
-        <label>Início <input id="startDate" type="date" /></label>
-        <span>até</span>
-        <label>Fim <input id="endDate" type="date" /></label>
-        <button id="applyRange" class="btn secondary compact">Atualizar</button>
+    <section class="app-page" data-app-page="finance">
+      <div class="page-head"><div><p class="eyebrow">BANQUINHO</p><h2>Dinheiro da casa</h2><p class="muted">Entradas, mercado, gás, pets, contas e o que ainda sobra.</p></div><button id="newFinanceButton" class="btn primary">+ Lançamento</button></div>
+      <div id="financeMetrics" class="metric-grid finance-metrics"></div><div class="panel page-panel"><div class="section-title-row"><div><h3>Movimentações</h3><p class="muted tiny">Marque como pago/comprado quando realmente acontecer.</p></div><select id="financeFilter" class="small-select"><option value="all">Tudo</option><option value="pending">Pendentes</option><option value="paid">Pagos</option><option value="expense">Gastos</option><option value="income">Entradas</option></select></div><div id="financeList" class="content-list"></div></div>
+    </section>
+
+    <section class="app-page" data-app-page="pets">
+      <div class="page-head"><div><p class="eyebrow">OS 4 PELUDOS</p><h2>Rotina dos pets</h2><p class="muted">Comida, água, caixa, carinho e cuidados extras.</p></div><label class="inline-date">Dia <input id="petDate" type="date" /></label></div><div id="petMetrics" class="metric-grid"></div><div id="petGrid" class="pet-grid"></div>
+    </section>
+
+    <section class="app-page" data-app-page="notices">
+      <div class="page-head"><div><p class="eyebrow">MURAL DE RECADOS</p><h2>O que o outro precisa ver</h2><p class="muted">Recados ficam sincronizados e aparecem como aviso quando a outra pessoa entrar.</p></div><button id="newNoticeButton" class="btn primary">+ Novo recado</button></div><div id="noticeList" class="notice-grid"></div>
+    </section>
+
+    <section class="app-page" data-app-page="summary">
+      <div class="page-head"><div><p class="eyebrow">MONITORAMENTO</p><h2>Como a rotina está indo?</h2><p class="muted">Um resumo para enxergar padrões — não para transformar tudo em obrigação.</p></div></div>
+      <div id="summaryMetrics" class="metric-grid summary-metrics"></div><div class="dashboard-grid">
+        <article class="panel dashboard-card"><div class="section-title-row"><h3>Atividades do período</h3><strong id="activityRate">0%</strong></div><div class="progress"><i id="activityProgress"></i></div><div id="activityBreakdown" class="breakdown"></div></article>
+        <article class="panel dashboard-card"><div class="section-title-row"><h3>Checklists</h3><strong id="taskRate">0%</strong></div><div class="progress"><i id="taskProgress"></i></div><div id="taskBreakdown" class="breakdown"></div></article>
+        <article class="panel dashboard-card"><div class="section-title-row"><h3>Pets — últimos 7 dias</h3><strong id="petRate">0%</strong></div><div class="progress"><i id="petProgress"></i></div><div id="petBreakdown" class="breakdown"></div></article>
+        <article class="panel dashboard-card"><h3>Dinheiro</h3><div id="financeBreakdown" class="breakdown"></div></article>
       </div>
-
-      <div class="legend">
-        <span><i class="dot good"></i> tempo bom</span>
-        <span><i class="dot bad"></i> tempo ruim</span>
-        <span><i class="dot done"></i> realizado</span>
-      </div>
     </section>
 
-    <section class="balance-strip">
-      <div>
-        <p class="eyebrow">EQUILÍBRIO DO PERÍODO</p>
-        <h3 id="balanceTitle">Alternem quem escolhe o dia</h3>
+    <section class="app-page" data-app-page="profile">
+      <div class="page-head"><div><p class="eyebrow">PERFIL E DISPONIBILIDADE</p><h2>Quando cada um pode?</h2><p class="muted">Trabalho, aula e horários livres aparecem no momento de marcar uma atividade.</p></div></div>
+      <div class="profile-layout">
+        <article class="panel profile-panel"><h3>Meu perfil</h3><form id="profileForm" class="stack"><label>Nome<input id="profileName" maxlength="40" required /></label><label>Cor no calendário<input id="profileColor" type="color" /></label><label>Recado do perfil<textarea id="profileNote" rows="3" maxlength="180" placeholder="Ex.: semana corrida, prova na quinta..."></textarea></label><button class="btn primary" type="submit">Salvar perfil</button></form><button id="enableNotifications" class="btn ghost full-btn">🔔 Ativar notificações do navegador</button></article>
+        <article class="panel availability-panel"><div class="section-title-row"><div><h3>Minha semana</h3><p class="muted tiny">Cadastre períodos disponíveis e/ou ocupados.</p></div></div><form id="availabilityForm" class="availability-form"><label>Dia<select id="availabilityWeekday"><option value="1">Segunda</option><option value="2">Terça</option><option value="3">Quarta</option><option value="4">Quinta</option><option value="5">Sexta</option><option value="6">Sábado</option><option value="0">Domingo</option></select></label><label>Data específica <input id="availabilityDate" type="date" /></label><label>De <input id="availabilityStart" type="time" required /></label><label>Até <input id="availabilityEnd" type="time" required /></label><label>Tipo<select id="availabilityType"><option value="busy">Ocupado</option><option value="available">Disponível</option></select></label><label>Motivo<input id="availabilityLabel" maxlength="60" placeholder="Trabalho, aula, livre..." required /></label><button class="btn primary" type="submit">Adicionar horário</button></form><div id="availabilityList" class="availability-list"></div></article>
       </div>
-      <div id="memberStats" class="member-stats"></div>
+      <div class="panel members-panel"><h3>Perfis da agenda</h3><div id="memberProfiles" class="member-profile-grid"></div></div>
     </section>
 
-    <section class="mobile-calendar-toolbar" aria-label="Navegação do calendário">
-      <button id="prevPeriod" class="calendar-nav-btn" type="button" aria-label="Período anterior">‹</button>
-      <button id="todayButton" class="calendar-today-btn" type="button">Hoje</button>
-      <div class="mobile-range-copy">
-        <strong id="mobileRangeTitle">Período</strong>
-        <small id="mobileRangeSubtitle">Calendário compartilhado</small>
-      </div>
-      <button id="nextPeriod" class="calendar-nav-btn" type="button" aria-label="Próximo período">›</button>
-    </section>
-
-    <section class="calendar-shell">
-      <div class="weekday-row">
-        <span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span><span>Dom</span>
-      </div>
-      <div id="calendarGrid" class="calendar-grid"></div>
-    </section>
-
-    <button id="mobileFab" class="mobile-fab" type="button" aria-label="Adicionar ou editar o dia de hoje">+</button>
-
-    <footer>
-      <span>Nosso Tempo ♡</span>
-      <span id="syncStatus">salvo neste dispositivo</span>
-    </footer>
+    <footer><span>Nosso Tempo ♡</span><span id="syncStatus">sincronizado</span></footer>
   </main>
 
-  <div id="themePopover" class="popover hidden">
-    <div class="popover-head">
-      <strong>Escolha suas cores</strong>
-      <button data-close-popover="themePopover">×</button>
-    </div>
-    <p class="tiny muted">A cor fica só no seu aparelho.</p>
-    <div id="themeOptions" class="theme-options"></div>
-  </div>
+  <div id="themePopover" class="popover hidden"><div class="popover-head"><strong>Escolha suas cores</strong><button data-close-popover="themePopover">×</button></div><div id="themeOptions" class="theme-options"></div></div>
+  <div id="menuPopover" class="popover hidden"><div class="popover-head"><strong>Agenda</strong><button data-close-popover="menuPopover">×</button></div><button id="switchBoard" class="menu-item">⇄ Trocar de agenda</button><button id="logoutButton" class="menu-item danger">↪ Sair da conta</button></div>
 
-  <div id="menuPopover" class="popover hidden">
-    <div class="popover-head">
-      <strong>Agenda</strong>
-      <button data-close-popover="menuPopover">×</button>
-    </div>
-    <button id="switchBoard" class="menu-item">⇄ Trocar de agenda</button>
-    <button id="logoutButton" class="menu-item danger">↪ Sair da conta</button>
-  </div>
+  <dialog id="dayDialog" class="sheet-dialog"><div class="sheet-content"><div class="sheet-handle"></div><div class="dialog-head"><div><p id="dayDialogWeekday" class="eyebrow"></p><h2 id="dayDialogDate"></h2></div><button class="close-btn" data-close-dialog="dayDialog">×</button></div><div id="dayDialogWeather" class="dialog-weather"></div><div id="dayPlanList" class="day-plan-list"></div><button id="addPlanForDay" class="btn primary full-btn">+ Adicionar atividade neste dia</button></div></dialog>
 
-  <dialog id="planDialog" class="plan-dialog">
-    <form id="planForm" method="dialog">
-      <div class="sheet-handle" aria-hidden="true"></div>
-      <div class="dialog-head">
-        <div>
-          <p id="dialogWeekday" class="eyebrow">SEGUNDA-FEIRA</p>
-          <h2 id="dialogDate">20 de agosto</h2>
-        </div>
-        <button id="closeDialog" type="button" class="close-btn">×</button>
-      </div>
+  <dialog id="planDialog" class="sheet-dialog large-sheet"><form id="planForm" class="sheet-content"><div class="sheet-handle"></div><div class="dialog-head"><div><p id="dialogWeekday" class="eyebrow"></p><h2 id="dialogDate"></h2></div><button id="closePlanDialog" type="button" class="close-btn">×</button></div><div id="dialogWeather" class="dialog-weather"></div>
+    <label>Título da atividade<input id="planTitle" maxlength="90" placeholder="Ex.: Caminhar juntos" required /></label>
+    <div class="form-grid"><label>Quem escolheu?<select id="chooserSelect"></select></label><label>Categoria<select id="category"><option value="💛 Tempo juntos">💛 Tempo juntos</option><option value="🏃 Movimento">🏃 Movimento</option><option value="🎲 Lazer">🎲 Lazer</option><option value="🏠 Casa">🏠 Casa</option><option value="💼 Trabalho / projeto">💼 Trabalho / projeto</option><option value="🌿 Cuidado">🌿 Cuidado</option><option value="✨ Outro">✨ Outro</option></select></label></div>
+    <fieldset class="participants-box"><legend>Quem participa?</legend><div id="participantChecks" class="participant-checks"></div></fieldset><div id="availabilityWarning" class="availability-warning"></div>
+    <div class="option-box good-box"><div class="option-title">☀️ <strong>Se o tempo estiver bom</strong></div><textarea id="goodOption" rows="2" maxlength="240" placeholder="Ex.: correr um pouco e caminhar o restante"></textarea></div>
+    <div class="option-box bad-box"><div class="option-title">🌧️ <strong>Se o tempo estiver ruim</strong></div><textarea id="badOption" rows="2" maxlength="240" placeholder="Ex.: leitura, jogo, cozinhar juntos"></textarea></div>
+    <div class="form-grid three"><label>Horário<input id="planTime" type="time" /></label><label>Plano escolhido<select id="selectedOption"><option value="auto">Decidir pelo clima</option><option value="good">Tempo bom</option><option value="bad">Tempo ruim</option></select></label><label>Lembrete<input id="reminderAt" type="datetime-local" /></label></div>
+    <div class="status-choice"><label class="status-tile done"><input id="activityDone" type="checkbox" /> <span>✓ Realizamos</span></label><label class="status-tile unexpected"><input id="activityUnexpected" type="checkbox" /> <span>⚡ Imprevisto</span></label></div><label id="incidentReasonWrap" class="hidden">O que aconteceu?<textarea id="incidentReason" rows="2" maxlength="220" placeholder="Ex.: chuva forte, plantão, mal-estar..."></textarea></label>
+    <section class="inline-checklist"><div class="section-title-row"><div><h3>Checklist da atividade</h3><p class="muted tiny">Subtarefas opcionais.</p></div></div><div class="checklist-add-row"><input id="newPlanChecklistText" maxlength="100" placeholder="Ex.: separar tênis" /><button id="addPlanChecklistItem" class="btn secondary" type="button">Adicionar</button></div><div id="planChecklistList" class="mini-checklist"></div></section>
+    <label>Anotações<textarea id="notes" rows="2" maxlength="400"></textarea></label><div class="dialog-actions"><button id="deletePlan" type="button" class="btn ghost danger-text">Excluir</button><div class="right-actions"><button id="downloadICS" type="button" class="btn ghost">Lembrete .ics</button><button type="submit" class="btn primary">Salvar atividade</button></div></div>
+  </form></dialog>
 
-      <div id="dialogWeather" class="dialog-weather"></div>
+  <dialog id="taskDialog" class="sheet-dialog"><form id="taskForm" class="sheet-content"><div class="sheet-handle"></div><div class="dialog-head"><div><p class="eyebrow">CHECKLIST</p><h2 id="taskDialogTitle">Nova tarefa</h2></div><button type="button" class="close-btn" data-close-dialog="taskDialog">×</button></div><label>Tarefa<input id="taskTitle" maxlength="100" required /></label><div class="form-grid"><label>Categoria<select id="taskCategory"><option>🏠 Casa</option><option>🛒 Compras</option><option>💸 Contas</option><option>🐾 Pets</option><option>📄 Burocracia</option><option>💛 Nós</option><option>✨ Outro</option></select></label><label>Prazo<input id="taskDueDate" type="date" /></label></div><label>Responsável<select id="taskAssignedTo"></select></label><label>Observação<textarea id="taskNotes" rows="3" maxlength="300"></textarea></label><div class="status-choice"><label class="status-tile done"><input id="taskDone" type="checkbox" /> <span>✓ Realizado</span></label><label class="status-tile unexpected"><input id="taskUnexpected" type="checkbox" /> <span>⚡ Imprevisto</span></label></div><div class="dialog-actions"><button id="deleteTask" type="button" class="btn ghost danger-text">Excluir</button><button class="btn primary" type="submit">Salvar tarefa</button></div></form></dialog>
 
-      <div class="form-grid">
-        <label>
-          Quem escolhe esse dia?
-          <select id="chooserSelect"></select>
-        </label>
+  <dialog id="financeDialog" class="sheet-dialog"><form id="financeForm" class="sheet-content"><div class="sheet-handle"></div><div class="dialog-head"><div><p class="eyebrow">BANQUINHO</p><h2 id="financeDialogTitle">Novo lançamento</h2></div><button type="button" class="close-btn" data-close-dialog="financeDialog">×</button></div><div class="form-grid"><label>Tipo<select id="financeKind"><option value="expense">Gasto</option><option value="income">Entrada</option></select></label><label>Valor (R$)<input id="financeAmount" type="number" min="0" step="0.01" required /></label></div><label>Descrição<input id="financeTitle" maxlength="100" placeholder="Ex.: Botijão de gás" required /></label><div class="form-grid"><label>Categoria<select id="financeCategory"><option>🛒 Mercado</option><option>🔥 Gás</option><option>🐾 Pets</option><option>🏠 Casa</option><option>💡 Contas</option><option>🚗 Transporte</option><option>🎉 Lazer</option><option>💰 Entrada</option><option>✨ Outro</option></select></label><label>Data<input id="financeDate" type="date" required /></label></div><label class="check-row"><input id="financePaid" type="checkbox" /> <span>Já foi pago / comprado / recebido</span></label><label>Observação<textarea id="financeNotes" rows="3" maxlength="300"></textarea></label><div class="dialog-actions"><button id="deleteFinance" type="button" class="btn ghost danger-text">Excluir</button><button class="btn primary" type="submit">Salvar lançamento</button></div></form></dialog>
 
-        <label>
-          Categoria
-          <select id="category">
-            <option value="💛 Tempo juntos">💛 Tempo juntos</option>
-            <option value="🏃 Movimento">🏃 Movimento</option>
-            <option value="🎲 Lazer">🎲 Lazer</option>
-            <option value="🏠 Casa">🏠 Casa</option>
-            <option value="💼 Trabalho / projeto">💼 Trabalho / projeto</option>
-            <option value="🌿 Cuidado">🌿 Cuidado</option>
-            <option value="✨ Outro">✨ Outro</option>
-          </select>
-        </label>
-      </div>
+  <dialog id="noticeDialog" class="sheet-dialog"><form id="noticeForm" class="sheet-content"><div class="sheet-handle"></div><div class="dialog-head"><div><p class="eyebrow">RECADO</p><h2>Novo recado</h2></div><button type="button" class="close-btn" data-close-dialog="noticeDialog">×</button></div><label>Título<input id="noticeTitle" maxlength="90" required /></label><label>Mensagem<textarea id="noticeBody" rows="5" maxlength="700" required></textarea></label><div class="form-grid"><label>Prioridade<select id="noticePriority"><option value="normal">Normal</option><option value="important">Importante</option></select></label><label>Expira em<input id="noticeExpires" type="date" /></label></div><button class="btn primary full-btn" type="submit">Publicar recado</button></form></dialog>
 
-      <div class="option-box good-box">
-        <div class="option-title"><span>☀️</span><strong>Se o tempo estiver bom</strong></div>
-        <textarea id="goodOption" rows="3" maxlength="240" placeholder="Ex.: correr um pouco e depois caminhar juntos"></textarea>
-      </div>
+  <dialog id="unreadDialog" class="sheet-dialog notification-sheet"><div class="sheet-content"><div class="sheet-handle"></div><div class="dialog-head"><div><p class="eyebrow">VOCÊ TEM RECADOS</p><h2>Antes de continuar 💌</h2></div><button type="button" class="close-btn" data-close-dialog="unreadDialog">×</button></div><div id="unreadNoticeList" class="content-list"></div><button id="markAllNoticesRead" class="btn primary full-btn">Marcar todos como lidos</button></div></dialog>
 
-      <div class="option-box bad-box">
-        <div class="option-title"><span>🌧️</span><strong>Se o tempo estiver ruim</strong></div>
-        <textarea id="badOption" rows="3" maxlength="240" placeholder="Ex.: leitura juntos ou um jogo"></textarea>
-      </div>
-
-      <div class="form-grid three">
-        <label>
-          Horário
-          <input id="planTime" type="time" />
-        </label>
-
-        <label>
-          Qual plano vale?
-          <select id="selectedOption">
-            <option value="auto">Decidir pelo clima</option>
-            <option value="good">Tempo bom</option>
-            <option value="bad">Tempo ruim</option>
-          </select>
-        </label>
-
-        <label>
-          Status
-          <select id="planStatus">
-            <option value="planned">Planejado</option>
-            <option value="done">Realizado ✓</option>
-            <option value="skipped">Não rolou</option>
-          </select>
-        </label>
-      </div>
-
-      <label>
-        Lembrete
-        <input id="reminderAt" type="datetime-local" />
-        <small class="field-note">O aviso do navegador funciona quando o site estiver aberto. Para garantir no celular, use também “Baixar lembrete”.</small>
-      </label>
-
-      <label>
-        Anotações
-        <textarea id="notes" rows="2" maxlength="400" placeholder="Qualquer detalhe que vocês queiram lembrar..."></textarea>
-      </label>
-
-      <div class="dialog-actions">
-        <button id="deletePlan" type="button" class="btn ghost danger-text">Excluir</button>
-        <div class="right-actions">
-          <button id="downloadICS" type="button" class="btn ghost">Baixar lembrete .ics</button>
-          <button id="savePlan" type="submit" class="btn primary">Salvar dia</button>
-        </div>
-      </div>
-    </form>
-  </dialog>
-
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js"></script>
-  <script src="app.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="config.js"></script><script src="app.js"></script>
 </body>
 </html>

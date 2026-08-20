@@ -1,52 +1,5 @@
-const CACHE_NAME = "nosso-tempo-v2";
-const STATIC_ASSETS = [
-  "./",
-  "./index.html",
-  "./style.css",
-  "./app.js",
-  "./manifest.webmanifest",
-  "./icon.svg"
-];
-
-self.addEventListener("install", event => {
-  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(STATIC_ASSETS)));
-  self.skipWaiting();
-});
-
-self.addEventListener("activate", event => {
-  event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key)))
-    )
-  );
-  self.clients.claim();
-});
-
-self.addEventListener("fetch", event => {
-  const request = event.request;
-  if (request.method !== "GET") return;
-
-  const url = new URL(request.url);
-
-  // Nunca cacheia config, Supabase ou clima: sempre busca a versão atual.
-  if (
-    url.pathname.endsWith("/config.js") ||
-    url.hostname.includes("supabase.co") ||
-    url.hostname.includes("open-meteo.com")
-  ) {
-    event.respondWith(fetch(request));
-    return;
-  }
-
-  event.respondWith(
-    fetch(request)
-      .then(response => {
-        if (response && response.ok && url.origin === self.location.origin) {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(request, clone));
-        }
-        return response;
-      })
-      .catch(() => caches.match(request).then(hit => hit || caches.match("./index.html")))
-  );
-});
+const CACHE_NAME="nosso-tempo-v3-20260820";
+const ASSETS=["./","./index.html","./style.css","./app.js","./manifest.webmanifest","./icon.svg"];
+self.addEventListener("install",e=>{e.waitUntil(caches.open(CACHE_NAME).then(c=>c.addAll(ASSETS)));self.skipWaiting()});
+self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE_NAME).map(k=>caches.delete(k)))));self.clients.claim()});
+self.addEventListener("fetch",e=>{if(e.request.method!=="GET")return;const u=new URL(e.request.url);if(u.pathname.endsWith("/config.js")||u.hostname.includes("supabase.co")||u.hostname.includes("open-meteo.com")){e.respondWith(fetch(e.request));return}e.respondWith(fetch(e.request).then(r=>{if(r.ok&&u.origin===self.location.origin)caches.open(CACHE_NAME).then(c=>c.put(e.request,r.clone()));return r}).catch(()=>caches.match(e.request).then(x=>x||caches.match("./index.html"))))});

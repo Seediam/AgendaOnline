@@ -1,913 +1,105 @@
-/* Nosso Tempo — app.js */
 (() => {
-  "use strict";
-
-  const CONFIG = window.APP_CONFIG || {};
-  const SUPABASE_READY = Boolean(CONFIG.SUPABASE_URL && CONFIG.SUPABASE_KEY && window.supabase);
-  const WEATHER_LAT = CONFIG.WEATHER_LATITUDE ?? -22.47203;
-  const WEATHER_LON = CONFIG.WEATHER_LONGITUDE ?? -43.14837;
-
-  const $ = (sel) => document.querySelector(sel);
-  const $$ = (sel) => [...document.querySelectorAll(sel)];
-
-  const state = {
-    mode: SUPABASE_READY ? "online" : "demo",
-    supabase: null,
-    session: null,
-    user: null,
-    board: null,
-    boards: [],
-    members: [],
-    plans: new Map(),
-    weather: new Map(),
-    activeDate: null,
-    authMode: "login",
-    realtimeChannel: null,
-    rangeStart: null,
-    rangeEnd: null
-  };
-
-  const themes = [
-    { id: "peach", name: "Pêssego", vars: { bg:"#fffaf7", surface:"#ffffff", surface2:"#fff1eb", primary:"#df8f7c", primaryDark:"#b86757", secondary:"#f3c9bc", accent:"#dbe9d5", accent2:"#dcd6f0", text:"#433b3a", muted:"#837777", border:"#eaded9", good:"#d7ead0", bad:"#d8e6f4", done:"#eed9a8" } },
-    { id: "lavender", name: "Lavanda", vars: { bg:"#fbf9ff", surface:"#ffffff", surface2:"#f1edfb", primary:"#9a86c5", primaryDark:"#715d9e", secondary:"#d8cff0", accent:"#dcebdc", accent2:"#f1dbe9", text:"#403b4b", muted:"#7e7789", border:"#e5dff0", good:"#dcebd8", bad:"#dfe6f5", done:"#f0dfb6" } },
-    { id: "mint", name: "Menta", vars: { bg:"#f8fdfb", surface:"#ffffff", surface2:"#eaf8f1", primary:"#78b99a", primaryDark:"#4d8c70", secondary:"#c8ead9", accent:"#f3dfc4", accent2:"#dfe1f5", text:"#34443e", muted:"#74857e", border:"#dcebe4", good:"#d9eddc", bad:"#dceaf4", done:"#f0e0b3" } },
-    { id: "sky", name: "Céu", vars: { bg:"#f8fbff", surface:"#ffffff", surface2:"#eaf3fb", primary:"#7caacb", primaryDark:"#527e9e", secondary:"#cce1f0", accent:"#e1ead1", accent2:"#eadcf0", text:"#35434e", muted:"#74818a", border:"#dbe8f0", good:"#dcebd8", bad:"#d7e8f5", done:"#efe0b5" } },
-    { id: "rose", name: "Rosé", vars: { bg:"#fff9fb", surface:"#ffffff", surface2:"#fbeaf0", primary:"#cf819b", primaryDark:"#9f5b72", secondary:"#f0c7d4", accent:"#dcebd9", accent2:"#e5ddf3", text:"#493a40", muted:"#89747b", border:"#eedde3", good:"#dcebd8", bad:"#dce7f3", done:"#f0ddb2" } },
-    { id: "vanilla", name: "Baunilha", vars: { bg:"#fffdf7", surface:"#ffffff", surface2:"#fbf2dc", primary:"#c49b61", primaryDark:"#92703f", secondary:"#eed8ad", accent:"#dce9d8", accent2:"#e1dded", text:"#463f35", muted:"#827b70", border:"#ebe2d2", good:"#dcebd6", bad:"#dde8f2", done:"#f0dea9" } }
-  ];
-
-  function toISODate(date) {
-    const y = date.getFullYear();
-    const m = String(date.getMonth()+1).padStart(2,"0");
-    const d = String(date.getDate()).padStart(2,"0");
-    return `${y}-${m}-${d}`;
-  }
-
-  function parseISODate(s) {
-    const [y,m,d] = s.split("-").map(Number);
-    return new Date(y, m-1, d);
-  }
-
-  function addDays(date, n) {
-    const d = new Date(date);
-    d.setDate(d.getDate()+n);
-    return d;
-  }
-
-  function addMonths(date, n) {
-    const d = new Date(date);
-    const day = d.getDate();
-    d.setDate(1);
-    d.setMonth(d.getMonth()+n);
-    const last = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
-    d.setDate(Math.min(day,last));
-    return d;
-  }
-
-  function formatDateLong(iso) {
-    return parseISODate(iso).toLocaleDateString("pt-BR", { day:"numeric", month:"long", year:"numeric" });
-  }
-
-  function formatWeekday(iso) {
-    return parseISODate(iso).toLocaleDateString("pt-BR", { weekday:"long" });
-  }
-
-  function shortMonth(date) {
-    return date.toLocaleDateString("pt-BR", { month:"short" }).replace(".", "");
-  }
-
-  function updateMobileRangeLabel() {
-    const title = $("#mobileRangeTitle");
-    const subtitle = $("#mobileRangeSubtitle");
-    if (!title || !state.rangeStart || !state.rangeEnd) return;
-    const start = parseISODate(state.rangeStart);
-    const end = parseISODate(state.rangeEnd);
-
-    if (start.getFullYear() === end.getFullYear()) {
-      title.textContent = `${start.getDate()} ${shortMonth(start)} — ${end.getDate()} ${shortMonth(end)}`;
-      subtitle.textContent = `${start.getFullYear()} • toque em um dia para editar`;
-    } else {
-      title.textContent = `${start.getDate()} ${shortMonth(start)} ${start.getFullYear()} — ${end.getDate()} ${shortMonth(end)} ${end.getFullYear()}`;
-      subtitle.textContent = "toque em um dia para editar";
-    }
-  }
-
-  async function applyRangeAndRefresh(startISO, endISO) {
-    state.rangeStart = startISO;
-    state.rangeEnd = endISO;
-    $("#startDate").value = startISO;
-    $("#endDate").value = endISO;
-    updateMobileRangeLabel();
-
-    if (state.mode === "online") await loadPlans();
-    else loadDemoPlans();
-
-    renderCalendar();
-    updateStats();
-    await loadWeather();
-  }
-
-  async function shiftCurrentPeriod(direction) {
-    const start = parseISODate(state.rangeStart);
-    const end = parseISODate(state.rangeEnd);
-    const newStart = addMonths(start, direction);
-    const newEnd = addMonths(end, direction);
-    await applyRangeAndRefresh(toISODate(newStart), toISODate(newEnd));
-  }
-
-  async function goToTodayRange() {
-    const now = new Date();
-    await applyRangeAndRefresh(toISODate(now), toISODate(addMonths(now, 1)));
-  }
-
-  function escapeHTML(value="") {
-    return String(value).replace(/[&<>"']/g, ch => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#039;" }[ch]));
-  }
-
-  function toast(msg) {
-    const el = $("#toast");
-    el.textContent = msg;
-    el.classList.add("show");
-    clearTimeout(toast.timer);
-    toast.timer = setTimeout(() => el.classList.remove("show"), 2600);
-  }
-
-  function setSync(text) {
-    $("#syncStatus").textContent = text;
-  }
-
-  function showOnly(id) {
-    ["#authScreen","#boardScreen","#app"].forEach(sel => $(sel).classList.add("hidden"));
-    $(id).classList.remove("hidden");
-  }
-
-  function applyTheme(id) {
-    const theme = themes.find(t => t.id === id) || themes[0];
-    const root = document.documentElement;
-    const mapping = {
-      bg:"--bg", surface:"--surface", surface2:"--surface-2", primary:"--primary",
-      primaryDark:"--primary-dark", secondary:"--secondary", accent:"--accent",
-      accent2:"--accent-2", text:"--text", muted:"--muted", border:"--border",
-      good:"--good", bad:"--bad", done:"--done"
-    };
-    Object.entries(theme.vars).forEach(([k,v]) => root.style.setProperty(mapping[k], v));
-    localStorage.setItem("nosso_tempo_theme", theme.id);
-  }
-
-  function renderThemeOptions() {
-    $("#themeOptions").innerHTML = themes.map(t => `
-      <button class="theme-choice" data-theme="${t.id}">
-        <span class="swatches">
-          <i style="background:${t.vars.primary}"></i>
-          <i style="background:${t.vars.surface2}"></i>
-          <i style="background:${t.vars.accent2}"></i>
-        </span>
-        <span>${t.name}</span>
-      </button>
-    `).join("");
-  }
-
-  function defaultRange() {
-    const today = new Date();
-    state.rangeStart = toISODate(today);
-    state.rangeEnd = toISODate(addMonths(today, 1));
-    $("#startDate").value = state.rangeStart;
-    $("#endDate").value = state.rangeEnd;
-    updateMobileRangeLabel();
-  }
-
-  function getDateRange(start, end) {
-    const dates = [];
-    let current = parseISODate(start);
-    const last = parseISODate(end);
-    let guard = 0;
-    while (current <= last && guard < 370) {
-      dates.push(toISODate(current));
-      current = addDays(current,1);
-      guard++;
-    }
-    return dates;
-  }
-
-  function weatherIcon(code) {
-    if (code === 0) return "☀️";
-    if ([1,2].includes(code)) return "🌤️";
-    if (code === 3) return "☁️";
-    if ([45,48].includes(code)) return "🌫️";
-    if ([51,53,55,56,57,61,63,65,66,67,80,81,82].includes(code)) return "🌧️";
-    if ([71,73,75,77,85,86].includes(code)) return "❄️";
-    if ([95,96,99].includes(code)) return "⛈️";
-    return "🌥️";
-  }
-
-  function weatherLabel(code) {
-    if (code === 0) return "céu limpo";
-    if ([1,2].includes(code)) return "poucas nuvens";
-    if (code === 3) return "nublado";
-    if ([45,48].includes(code)) return "neblina";
-    if ([51,53,55,56,57].includes(code)) return "garoa";
-    if ([61,63,65,66,67,80,81,82].includes(code)) return "chuva";
-    if ([71,73,75,77,85,86].includes(code)) return "frio / neve";
-    if ([95,96,99].includes(code)) return "trovoadas";
-    return "tempo variável";
-  }
-
-  function isBadWeather(w) {
-    if (!w) return false;
-    return (w.precip ?? 0) >= 50 || [51,53,55,56,57,61,63,65,66,67,80,81,82,95,96,99].includes(w.code);
-  }
-
-  async function loadWeather() {
-    state.weather.clear();
-    const today = new Date();
-    const todayISO = toISODate(today);
-    const maxForecast = toISODate(addDays(today, 15));
-
-    let start = state.rangeStart < todayISO ? todayISO : state.rangeStart;
-    let end = state.rangeEnd > maxForecast ? maxForecast : state.rangeEnd;
-
-    if (start > end) {
-      updateTodayWeather();
-      renderCalendar();
-      return;
-    }
-
-    try {
-      const params = new URLSearchParams({
-        latitude: WEATHER_LAT,
-        longitude: WEATHER_LON,
-        daily: "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
-        timezone: "America/Sao_Paulo",
-        start_date: start,
-        end_date: end
-      });
-      const res = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`);
-      if (!res.ok) throw new Error("Falha no clima");
-      const data = await res.json();
-      (data.daily?.time || []).forEach((date, i) => {
-        state.weather.set(date, {
-          code: data.daily.weather_code[i],
-          max: Math.round(data.daily.temperature_2m_max[i]),
-          min: Math.round(data.daily.temperature_2m_min[i]),
-          precip: data.daily.precipitation_probability_max[i] ?? 0
-        });
-      });
-    } catch (err) {
-      console.warn(err);
-    }
-    updateTodayWeather();
-    renderCalendar();
-  }
-
-  function updateTodayWeather() {
-    const today = toISODate(new Date());
-    const w = state.weather.get(today);
-    if (!w) {
-      $("#todayWeatherIcon").textContent = "🌥️";
-      $("#todayWeatherTitle").textContent = "Previsão indisponível";
-      $("#todayWeatherText").textContent = "O calendário continua funcionando normalmente.";
-      return;
-    }
-    $("#todayWeatherIcon").textContent = weatherIcon(w.code);
-    $("#todayWeatherTitle").textContent = `${w.max}° / ${w.min}° • ${weatherLabel(w.code)}`;
-    $("#todayWeatherText").textContent = `${w.precip}% de chance de chuva hoje.`;
-  }
-
-  // -------------------- DEMO STORE --------------------
-  function initDemo() {
-    state.user = { id:"demo-user", email:"demo@local" };
-    state.session = { user: state.user };
-    state.board = { id:"demo-board", name:"Nosso Tempo", join_code:"LOCAL" };
-    state.boards = [state.board];
-    state.members = [
-      { user_id:"demo-user", display_name:"Você" },
-      { user_id:"demo-partner", display_name:"Outra pessoa" }
-    ];
-    $("#demoBanner").classList.remove("hidden");
-    loadDemoPlans();
-    enterApp();
-  }
-
-  function demoKey() {
-    return "nosso_tempo_demo_plans";
-  }
-
-  function loadDemoPlans() {
-    const raw = JSON.parse(localStorage.getItem(demoKey()) || "[]");
-    state.plans = new Map(raw.map(p => [p.plan_date, p]));
-  }
-
-  function saveDemoPlans() {
-    localStorage.setItem(demoKey(), JSON.stringify([...state.plans.values()]));
-  }
-
-  // -------------------- SUPABASE --------------------
-  async function initOnline() {
-    state.supabase = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_KEY, {
-      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
-    });
-
-    const { data } = await state.supabase.auth.getSession();
-    state.session = data.session;
-    state.user = data.session?.user || null;
-
-    state.supabase.auth.onAuthStateChange((_event, session) => {
-      state.session = session;
-      state.user = session?.user || null;
-    });
-
-    if (!state.user) {
-      showOnly("#authScreen");
-      return;
-    }
-    await loadBoards();
-  }
-
-  async function loadBoards() {
-    const { data: memberships, error } = await state.supabase
-      .from("board_members")
-      .select("board_id, display_name")
-      .eq("user_id", state.user.id);
-
-    if (error) {
-      console.error(error);
-      toast("Não consegui carregar suas agendas.");
-      return;
-    }
-
-    if (!memberships?.length) {
-      state.boards = [];
-      renderExistingBoards();
-      showOnly("#boardScreen");
-      return;
-    }
-
-    const ids = memberships.map(m => m.board_id);
-    const { data: boards, error: bErr } = await state.supabase
-      .from("boards")
-      .select("id,name,join_code,created_at")
-      .in("id", ids);
-
-    if (bErr) {
-      console.error(bErr);
-      toast("Erro ao carregar agendas.");
-      return;
-    }
-
-    state.boards = boards || [];
-    const last = localStorage.getItem("nosso_tempo_board_id");
-    const chosen = state.boards.find(b => b.id === last) || state.boards[0];
-    if (chosen) {
-      await selectBoard(chosen);
-    } else {
-      renderExistingBoards();
-      showOnly("#boardScreen");
-    }
-  }
-
-  async function selectBoard(board) {
-    state.board = board;
-    localStorage.setItem("nosso_tempo_board_id", board.id);
-    await Promise.all([loadMembers(), loadPlans()]);
-    subscribeRealtime();
-    enterApp();
-  }
-
-  async function loadMembers() {
-    const { data, error } = await state.supabase
-      .from("board_members")
-      .select("user_id,display_name,joined_at")
-      .eq("board_id", state.board.id)
-      .order("joined_at", { ascending:true });
-
-    if (!error) state.members = data || [];
-  }
-
-  async function loadPlans() {
-    setSync("sincronizando...");
-    const { data, error } = await state.supabase
-      .from("day_plans")
-      .select("*")
-      .eq("board_id", state.board.id)
-      .gte("plan_date", state.rangeStart)
-      .lte("plan_date", state.rangeEnd);
-
-    if (error) {
-      console.error(error);
-      setSync("erro ao sincronizar");
-      toast("Não consegui carregar o calendário.");
-      return;
-    }
-
-    state.plans = new Map((data || []).map(p => [p.plan_date, p]));
-    setSync("sincronizado agora");
-  }
-
-  function subscribeRealtime() {
-    if (!state.supabase || !state.board) return;
-    if (state.realtimeChannel) state.supabase.removeChannel(state.realtimeChannel);
-
-    state.realtimeChannel = state.supabase
-      .channel(`plans-${state.board.id}`)
-      .on("postgres_changes", {
-        event: "*",
-        schema: "public",
-        table: "day_plans",
-        filter: `board_id=eq.${state.board.id}`
-      }, async () => {
-        await loadPlans();
-        renderCalendar();
-        updateStats();
-      })
-      .subscribe();
-  }
-
-  async function savePlanOnline(plan) {
-    const payload = {
-      board_id: state.board.id,
-      plan_date: plan.plan_date,
-      chooser_user_id: plan.chooser_user_id || null,
-      category: plan.category,
-      good_option: plan.good_option || null,
-      bad_option: plan.bad_option || null,
-      start_time: plan.start_time || null,
-      selected_option: plan.selected_option,
-      status: plan.status,
-      reminder_at: plan.reminder_at || null,
-      notes: plan.notes || null,
-      updated_by: state.user.id,
-      updated_at: new Date().toISOString()
-    };
-    const { data, error } = await state.supabase
-      .from("day_plans")
-      .upsert(payload, { onConflict:"board_id,plan_date" })
-      .select()
-      .single();
-    if (error) throw error;
-    state.plans.set(data.plan_date, data);
-  }
-
-  async function deletePlanOnline(date) {
-    const { error } = await state.supabase
-      .from("day_plans")
-      .delete()
-      .eq("board_id", state.board.id)
-      .eq("plan_date", date);
-    if (error) throw error;
-    state.plans.delete(date);
-  }
-
-  // -------------------- UI --------------------
-  function enterApp() {
-    $("#appTitle").textContent = state.board?.name || "Nosso Tempo";
-    $("#inviteCode").textContent = state.board?.join_code || "LOCAL";
-    showOnly("#app");
-    renderChooserOptions();
-    renderCalendar();
-    updateStats();
-    loadWeather();
-    checkReminders();
-  }
-
-  function renderExistingBoards() {
-    const wrap = $("#existingBoards");
-    if (!state.boards.length) {
-      wrap.innerHTML = "";
-      return;
-    }
-    wrap.innerHTML = `<p class="eyebrow">SUAS AGENDAS</p>` + state.boards.map(b => `
-      <button class="existing-board" data-board-id="${b.id}">
-        <span><strong>${escapeHTML(b.name)}</strong><br><small class="muted">código ${escapeHTML(b.join_code)}</small></span>
-        <span>→</span>
-      </button>
-    `).join("");
-  }
-
-  function renderChooserOptions(selected="") {
-    const options = state.members.map(m => `
-      <option value="${m.user_id}" ${m.user_id === selected ? "selected":""}>${escapeHTML(m.display_name)}</option>
-    `).join("");
-    $("#chooserSelect").innerHTML = `<option value="">Ainda não definido</option>${options}`;
-  }
-
-  function memberName(id) {
-    return state.members.find(m => m.user_id === id)?.display_name || "Sem responsável";
-  }
-
-  function updateStats() {
-    const counts = Object.fromEntries(state.members.map(m => [m.user_id, 0]));
-    [...state.plans.values()].forEach(p => {
-      if (p.chooser_user_id && counts[p.chooser_user_id] !== undefined) counts[p.chooser_user_id]++;
-    });
-    $("#memberStats").innerHTML = state.members.map(m =>
-      `<span class="member-pill">${escapeHTML(m.display_name)} • ${counts[m.user_id] || 0} dia(s)</span>`
-    ).join("");
-    if (state.members.length >= 2) {
-      const values = state.members.map(m => counts[m.user_id] || 0);
-      const diff = Math.max(...values) - Math.min(...values);
-      $("#balanceTitle").textContent = diff <= 1 ? "Está bem equilibrado ♡" : "Talvez seja a vez de quem escolheu menos";
-    }
-  }
-
-  function renderCalendar() {
-    if (!state.rangeStart || !state.rangeEnd) return;
-    updateMobileRangeLabel();
-
-    const dates = getDateRange(state.rangeStart, state.rangeEnd);
-    const first = parseISODate(state.rangeStart);
-    const blankCount = (first.getDay() + 6) % 7; // segunda = 0
-    const blanks = Array.from({length: blankCount}, () => `<div class="blank-day"></div>`).join("");
-    const today = toISODate(new Date());
-
-    const cards = dates.map(date => {
-      const d = parseISODate(date);
-      const plan = state.plans.get(date);
-      const w = state.weather.get(date);
-      const isDone = plan?.status === "done";
-      const weekdayShort = d.toLocaleDateString("pt-BR",{weekday:"short"}).replace(".","");
-      const weatherHTML = w
-        ? `<span class="weather-mini" title="${escapeHTML(weatherLabel(w.code))}">${weatherIcon(w.code)} <span>${w.max}° • ${w.precip}%</span></span>`
-        : `<span class="weather-mini" title="Previsão ainda indisponível">🗓️ <span>—</span></span>`;
-
-      let content = `<div class="empty-copy">Clique para combinar as duas opções do dia.</div>`;
-      if (plan) {
-        const stateClass = plan.status === "done" ? "done" : plan.status === "skipped" ? "skipped" : "";
-        const compactChooser = plan.chooser_user_id ? memberName(plan.chooser_user_id) : "";
-        const compactTime = plan.start_time ? String(plan.start_time).slice(0,5) : "";
-        content = `
-          ${plan.chooser_user_id ? `<div class="chooser-chip">escolhe: ${escapeHTML(memberName(plan.chooser_user_id))}</div>` : ""}
-          <div class="category-chip">${escapeHTML(plan.category || "💛 Tempo juntos")}</div>
-          <div class="mobile-plan-meta"><i class="mobile-plan-state ${stateClass}"></i>${escapeHTML(compactTime)}${compactTime && compactChooser ? " • " : ""}${escapeHTML(compactChooser)}</div>
-          <div class="plan-preview">
-            ${plan.good_option ? `<div class="plan-line good" title="Tempo bom: ${escapeHTML(plan.good_option)}">☀ ${escapeHTML(plan.good_option)}</div>` : ""}
-            ${plan.bad_option ? `<div class="plan-line bad" title="Tempo ruim: ${escapeHTML(plan.bad_option)}">☂ ${escapeHTML(plan.bad_option)}</div>` : ""}
-          </div>
-          ${plan.status === "done" ? `<span class="status-badge">✓ realizado</span>` : plan.status === "skipped" ? `<span class="status-badge">não rolou</span>` : ""}
-          ${plan.start_time ? `<span class="time-badge">⏰ ${String(plan.start_time).slice(0,5)}</span>` : ""}
-        `;
-      }
-
-      return `
-        <article class="day-card ${date===today?"today":""} ${isDone?"done-card":""}" data-date="${date}">
-          <div class="day-head">
-            <span class="day-number"><strong>${d.getDate()}</strong><small>${weekdayShort}</small></span>
-            ${weatherHTML}
-          </div>
-          ${content}
-        </article>
-      `;
-    }).join("");
-
-    $("#calendarGrid").innerHTML = blanks + cards;
-  }
-
-  function openPlanDialog(date) {
-    state.activeDate = date;
-    const plan = state.plans.get(date) || {
-      plan_date: date, chooser_user_id:"", category:"💛 Tempo juntos",
-      good_option:"", bad_option:"", start_time:"", selected_option:"auto",
-      status:"planned", reminder_at:"", notes:""
-    };
-
-    $("#dialogWeekday").textContent = formatWeekday(date).toUpperCase();
-    $("#dialogDate").textContent = formatDateLong(date);
-    renderChooserOptions(plan.chooser_user_id || "");
-    $("#category").value = plan.category || "💛 Tempo juntos";
-    $("#goodOption").value = plan.good_option || "";
-    $("#badOption").value = plan.bad_option || "";
-    $("#planTime").value = plan.start_time ? String(plan.start_time).slice(0,5) : "";
-    $("#selectedOption").value = plan.selected_option || "auto";
-    $("#planStatus").value = plan.status || "planned";
-    $("#notes").value = plan.notes || "";
-
-    let reminder = "";
-    if (plan.reminder_at) {
-      const dt = new Date(plan.reminder_at);
-      const local = new Date(dt.getTime() - dt.getTimezoneOffset()*60000);
-      reminder = local.toISOString().slice(0,16);
-    }
-    $("#reminderAt").value = reminder;
-
-    const w = state.weather.get(date);
-    if (w) {
-      const verdict = isBadWeather(w) ? "A previsão hoje favorece o plano de tempo ruim." : "A previsão hoje favorece o plano de tempo bom.";
-      $("#dialogWeather").innerHTML = `${weatherIcon(w.code)} <strong>${w.max}° / ${w.min}°</strong> • ${w.precip}% de chuva • ${escapeHTML(weatherLabel(w.code))}. <span class="muted">${verdict}</span>`;
-    } else {
-      $("#dialogWeather").innerHTML = `🗓️ <span class="muted">A previsão ainda não está disponível para esta data. O Open‑Meteo costuma cobrir os próximos dias.</span>`;
-    }
-
-    $("#deletePlan").style.visibility = state.plans.has(date) ? "visible" : "hidden";
-    $("#planDialog").showModal();
-  }
-
-  function formToPlan() {
-    const reminderVal = $("#reminderAt").value;
-    return {
-      plan_date: state.activeDate,
-      chooser_user_id: $("#chooserSelect").value || null,
-      category: $("#category").value,
-      good_option: $("#goodOption").value.trim(),
-      bad_option: $("#badOption").value.trim(),
-      start_time: $("#planTime").value || null,
-      selected_option: $("#selectedOption").value,
-      status: $("#planStatus").value,
-      reminder_at: reminderVal ? new Date(reminderVal).toISOString() : null,
-      notes: $("#notes").value.trim(),
-      board_id: state.board?.id,
-      updated_by: state.user?.id,
-      updated_at: new Date().toISOString()
-    };
-  }
-
-  async function saveActivePlan() {
-    const plan = formToPlan();
-    if (!plan.good_option && !plan.bad_option) {
-      toast("Coloque pelo menos uma opção para o dia.");
-      return false;
-    }
-    try {
-      setSync("salvando...");
-      if (state.mode === "demo") {
-        state.plans.set(plan.plan_date, { ...plan, id: state.plans.get(plan.plan_date)?.id || crypto.randomUUID() });
-        saveDemoPlans();
-      } else {
-        await savePlanOnline(plan);
-      }
-      setSync(state.mode === "demo" ? "salvo neste dispositivo" : "sincronizado agora");
-      renderCalendar();
-      updateStats();
-      toast("Dia salvo ♡");
-      return true;
-    } catch (err) {
-      console.error(err);
-      setSync("erro ao salvar");
-      toast(err.message || "Não consegui salvar.");
-      return false;
-    }
-  }
-
-  async function deleteActivePlan() {
-    if (!state.activeDate || !state.plans.has(state.activeDate)) return;
-    try {
-      if (state.mode === "demo") {
-        state.plans.delete(state.activeDate);
-        saveDemoPlans();
-      } else {
-        await deletePlanOnline(state.activeDate);
-      }
-      renderCalendar();
-      updateStats();
-      $("#planDialog").close();
-      toast("Dia apagado.");
-    } catch (err) {
-      console.error(err);
-      toast("Não consegui excluir.");
-    }
-  }
-
-  function downloadICSForPlan(plan) {
-    const date = plan.plan_date.replaceAll("-","");
-    const time = (plan.start_time || "19:00").replace(":","") + "00";
-    const start = `${date}T${time}`;
-    const endDate = new Date(parseISODate(plan.plan_date));
-    const [hh,mm] = (plan.start_time || "19:00").split(":").map(Number);
-    endDate.setHours(hh+1, mm, 0, 0);
-    const end = `${toISODate(endDate).replaceAll("-","")}T${String(endDate.getHours()).padStart(2,"0")}${String(endDate.getMinutes()).padStart(2,"0")}00`;
-    const selectedText = plan.selected_option === "good" ? plan.good_option
-      : plan.selected_option === "bad" ? plan.bad_option
-      : `Tempo bom: ${plan.good_option || "—"} | Tempo ruim: ${plan.bad_option || "—"}`;
-    const description = (selectedText + (plan.notes ? ` | ${plan.notes}`:"")).replace(/\n/g," ").replace(/,/g,"\\,");
-    const title = `${plan.category || "Nosso Tempo"} — ${state.board?.name || "Nosso Tempo"}`.replace(/,/g,"\\,");
-
-    const ics = [
-      "BEGIN:VCALENDAR",
-      "VERSION:2.0",
-      "PRODID:-//Nosso Tempo//PT-BR",
-      "CALSCALE:GREGORIAN",
-      "BEGIN:VEVENT",
-      `UID:${crypto.randomUUID()}@nosso-tempo`,
-      `DTSTAMP:${new Date().toISOString().replace(/[-:]/g,"").replace(/\.\d{3}Z/,"Z")}`,
-      `DTSTART;TZID=America/Sao_Paulo:${start}`,
-      `DTEND;TZID=America/Sao_Paulo:${end}`,
-      `SUMMARY:${title}`,
-      `DESCRIPTION:${description}`,
-      "BEGIN:VALARM",
-      "TRIGGER:-PT30M",
-      "ACTION:DISPLAY",
-      "DESCRIPTION:Lembrete Nosso Tempo",
-      "END:VALARM",
-      "END:VEVENT",
-      "END:VCALENDAR"
-    ].join("\r\n");
-
-    const blob = new Blob([ics], {type:"text/calendar;charset=utf-8"});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `nosso-tempo-${plan.plan_date}.ics`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  }
-
-  async function requestNotifications() {
-    if (!("Notification" in window)) {
-      toast("Este navegador não oferece notificações.");
-      return;
-    }
-    const result = await Notification.requestPermission();
-    toast(result === "granted" ? "Lembretes ativados neste navegador." : "Notificações não foram autorizadas.");
-  }
-
-  function checkReminders() {
-    if (!("Notification" in window) || Notification.permission !== "granted") return;
-    const now = Date.now();
-    const notified = new Set(JSON.parse(localStorage.getItem("nosso_tempo_notified") || "[]"));
-    let changed = false;
-
-    [...state.plans.values()].forEach(plan => {
-      if (!plan.reminder_at || notified.has(plan.id)) return;
-      const t = new Date(plan.reminder_at).getTime();
-      if (t <= now && t >= now - 90_000) {
-        const body = plan.selected_option === "bad" ? plan.bad_option
-          : plan.selected_option === "good" ? plan.good_option
-          : plan.good_option || plan.bad_option || "Vocês têm algo combinado.";
-        new Notification("Nosso Tempo ♡", { body });
-        notified.add(plan.id);
-        changed = true;
-      }
-    });
-    if (changed) localStorage.setItem("nosso_tempo_notified", JSON.stringify([...notified].slice(-200)));
-  }
-
-  // -------------------- EVENTS --------------------
-  function bindEvents() {
-    $$(".tab").forEach(btn => btn.addEventListener("click", () => {
-      state.authMode = btn.dataset.authTab;
-      $$(".tab").forEach(x => x.classList.toggle("active", x === btn));
-      $("#authSubmit").textContent = state.authMode === "login" ? "Entrar" : "Criar conta";
-      $("#authHint").textContent = state.authMode === "signup"
-        ? "Depois do cadastro, talvez o Supabase peça confirmação por e-mail, dependendo da configuração do projeto."
-        : "";
-    }));
-
-    $("#authForm").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      if (!state.supabase) return;
-      const email = $("#authEmail").value.trim();
-      const password = $("#authPassword").value;
-      try {
-        if (state.authMode === "signup") {
-          const { data, error } = await state.supabase.auth.signUp({ email, password });
-          if (error) throw error;
-          if (!data.session) {
-            toast("Conta criada. Confirme o e-mail e depois entre.");
-            state.authMode = "login";
-            $$(".tab").forEach(x => x.classList.toggle("active", x.dataset.authTab === "login"));
-            $("#authSubmit").textContent = "Entrar";
-          } else {
-            state.user = data.user; state.session = data.session; await loadBoards();
-          }
-        } else {
-          const { data, error } = await state.supabase.auth.signInWithPassword({ email, password });
-          if (error) throw error;
-          state.user = data.user; state.session = data.session; await loadBoards();
-        }
-      } catch (err) {
-        toast(err.message || "Não foi possível entrar.");
-      }
-    });
-
-    $("#createBoardForm").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const name = $("#boardName").value.trim();
-      const display = $("#creatorName").value.trim();
-      const { data, error } = await state.supabase.rpc("create_board", { p_name:name, p_display_name:display });
-      if (error) return toast(error.message);
-      toast(`Agenda criada! Código ${data?.[0]?.join_code || ""}`);
-      await loadBoards();
-    });
-
-    $("#joinBoardForm").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const code = $("#joinCode").value.trim();
-      const display = $("#joinName").value.trim();
-      const { error } = await state.supabase.rpc("join_board", { p_join_code:code, p_display_name:display });
-      if (error) return toast(error.message);
-      toast("Você entrou na agenda ♡");
-      await loadBoards();
-    });
-
-    $("#existingBoards").addEventListener("click", async (e) => {
-      const btn = e.target.closest("[data-board-id]");
-      if (!btn) return;
-      const board = state.boards.find(b => b.id === btn.dataset.boardId);
-      if (board) await selectBoard(board);
-    });
-
-    $("#boardLogout").addEventListener("click", async () => {
-      await state.supabase?.auth.signOut();
-      state.user = null; state.session = null; showOnly("#authScreen");
-    });
-
-    $("#calendarGrid").addEventListener("click", (e) => {
-      const card = e.target.closest(".day-card");
-      if (card) openPlanDialog(card.dataset.date);
-    });
-
-    $("#planForm").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      if (await saveActivePlan()) $("#planDialog").close();
-    });
-
-    $("#closeDialog").addEventListener("click", () => $("#planDialog").close());
-    $("#deletePlan").addEventListener("click", deleteActivePlan);
-    $("#downloadICS").addEventListener("click", () => downloadICSForPlan(formToPlan()));
-
-    $("#applyRange").addEventListener("click", async () => {
-      const s = $("#startDate").value, e = $("#endDate").value;
-      if (!s || !e || s > e) return toast("Escolha um período válido.");
-      const diff = Math.round((parseISODate(e)-parseISODate(s))/86400000);
-      if (diff > 365) return toast("Escolha um período de até 1 ano.");
-      await applyRangeAndRefresh(s, e);
-    });
-
-    $("#prevPeriod")?.addEventListener("click", () => shiftCurrentPeriod(-1));
-    $("#nextPeriod")?.addEventListener("click", () => shiftCurrentPeriod(1));
-    $("#todayButton")?.addEventListener("click", goToTodayRange);
-
-    $("#mobileFab")?.addEventListener("click", () => {
-      const today = toISODate(new Date());
-      const target = today >= state.rangeStart && today <= state.rangeEnd ? today : state.rangeStart;
-      openPlanDialog(target);
-    });
-
-    $("#themeButton").addEventListener("click", () => {
-      $("#themePopover").classList.toggle("hidden");
-      $("#menuPopover").classList.add("hidden");
-    });
-    $("#menuButton").addEventListener("click", () => {
-      $("#menuPopover").classList.toggle("hidden");
-      $("#themePopover").classList.add("hidden");
-    });
-    $$("[data-close-popover]").forEach(btn => btn.addEventListener("click", () => $("#" + btn.dataset.closePopover).classList.add("hidden")));
-
-    $("#themeOptions").addEventListener("click", (e) => {
-      const btn = e.target.closest("[data-theme]");
-      if (!btn) return;
-      applyTheme(btn.dataset.theme);
-      $("#themePopover").classList.add("hidden");
-    });
-
-    $("#notifyButton").addEventListener("click", requestNotifications);
-
-    $("#copyInvite").addEventListener("click", async () => {
-      const code = state.board?.join_code || "LOCAL";
-      try {
-        await navigator.clipboard.writeText(code);
-        toast("Código copiado.");
-      } catch {
-        toast(`Código: ${code}`);
-      }
-    });
-
-    $("#switchBoard").addEventListener("click", () => {
-      $("#menuPopover").classList.add("hidden");
-      if (state.mode === "demo") return toast("No modo demonstração existe só uma agenda.");
-      renderExistingBoards();
-      showOnly("#boardScreen");
-    });
-
-    $("#logoutButton").addEventListener("click", async () => {
-      $("#menuPopover").classList.add("hidden");
-      if (state.mode === "demo") return toast("Modo demonstração local.");
-      await state.supabase.auth.signOut();
-      state.user = null; state.session = null; showOnly("#authScreen");
-    });
-
-    document.addEventListener("click", (e) => {
-      if (!e.target.closest("#themePopover") && !e.target.closest("#themeButton")) $("#themePopover").classList.add("hidden");
-      if (!e.target.closest("#menuPopover") && !e.target.closest("#menuButton")) $("#menuPopover").classList.add("hidden");
-    });
-
-    setInterval(checkReminders, 30_000);
-  }
-
-  async function boot() {
-    applyTheme(localStorage.getItem("nosso_tempo_theme") || "peach");
-    renderThemeOptions();
-    defaultRange();
-    bindEvents();
-
-    if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
-      navigator.serviceWorker.register("./service-worker.js").catch(err => console.warn("Service Worker:", err));
-    }
-
-    if (state.mode === "demo") {
-      initDemo();
-    } else {
-      await initOnline();
-    }
-  }
-
-  boot();
+"use strict";
+const CONFIG=window.APP_CONFIG||{},SUPABASE_READY=Boolean(CONFIG.SUPABASE_URL&&CONFIG.SUPABASE_KEY&&window.supabase),WEATHER_LAT=CONFIG.WEATHER_LATITUDE??-22.47203,WEATHER_LON=CONFIG.WEATHER_LONGITUDE??-43.14837;
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const THEMES=[
+{id:"peach",name:"Pêssego",v:{bg:"#fffaf7",surface:"#fff",s2:"#fff1eb",p:"#df8f7c",pd:"#b86757",sec:"#f3c9bc",a:"#dbe9d5",a2:"#dcd6f0",text:"#433b3a",muted:"#837777",border:"#eaded9",good:"#d7ead0",bad:"#d8e6f4",done:"#eed9a8",unexpected:"#e8d8f2"}},
+{id:"lavender",name:"Lavanda",v:{bg:"#fbf9ff",surface:"#fff",s2:"#f1edfb",p:"#9a86c5",pd:"#715d9e",sec:"#d8cff0",a:"#dcebdc",a2:"#f1dbe9",text:"#403b4b",muted:"#7e7789",border:"#e5dff0",good:"#dcebd8",bad:"#dfe6f5",done:"#f0dfb6",unexpected:"#eadcf4"}},
+{id:"mint",name:"Menta",v:{bg:"#f8fdfb",surface:"#fff",s2:"#eaf8f1",p:"#78b99a",pd:"#4d8c70",sec:"#c8ead9",a:"#f3dfc4",a2:"#dfe1f5",text:"#34443e",muted:"#74857e",border:"#dcebe4",good:"#d9eddc",bad:"#dceaf4",done:"#f0e0b3",unexpected:"#e7def1"}},
+{id:"sky",name:"Céu",v:{bg:"#f8fbff",surface:"#fff",s2:"#eaf3fb",p:"#7caacb",pd:"#527e9e",sec:"#cce1f0",a:"#e1ead1",a2:"#eadcf0",text:"#35434e",muted:"#74818a",border:"#dbe8f0",good:"#dcebd8",bad:"#d7e8f5",done:"#efe0b5",unexpected:"#e9ddf3"}},
+{id:"rose",name:"Rosé",v:{bg:"#fff9fb",surface:"#fff",s2:"#fbeaf0",p:"#cf819b",pd:"#9f5b72",sec:"#f0c7d4",a:"#dcebd9",a2:"#e5ddf3",text:"#493a40",muted:"#89747b",border:"#eedde3",good:"#dcebd8",bad:"#dce7f3",done:"#f0ddb2",unexpected:"#eadcf0"}},
+{id:"vanilla",name:"Baunilha",v:{bg:"#fffdf7",surface:"#fff",s2:"#fbf2dc",p:"#c49b61",pd:"#92703f",sec:"#eed8ad",a:"#dce9d8",a2:"#e1dded",text:"#463f35",muted:"#827b70",border:"#ebe2d2",good:"#dcebd6",bad:"#dde8f2",done:"#f0dea9",unexpected:"#e9e0ef"}}];
+const PET_DEFAULT_TASKS=["🍽️ Comida","💧 Água","🧹 Caixa de areia","💛 Carinho / brincadeira"],WEEKDAYS=["Domingo","Segunda","Terça","Quarta","Quinta","Sexta","Sábado"];
+const state={mode:SUPABASE_READY?"online":"demo",supabase:null,session:null,user:null,board:null,boards:[],members:[],plans:[],planChecklist:[],planParticipants:[],tasks:[],finance:[],pets:[],petLogs:[],notices:[],noticeReads:[],availability:[],weather:new Map(),rangeStart:null,rangeEnd:null,page:"calendar",authMode:"login",activeDate:null,editingPlanId:null,editingTaskId:null,editingFinanceId:null,editChecklist:[],realtimeChannel:null,taskFilter:"all"};
+function isoDate(d){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,"0"),day=String(d.getDate()).padStart(2,"0");return`${y}-${m}-${day}`}
+function parseDate(s){const[y,m,d]=s.split("-").map(Number);return new Date(y,m-1,d)}function addDays(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x}function addMonths(d,n){const x=new Date(d),day=x.getDate();x.setDate(1);x.setMonth(x.getMonth()+n);x.setDate(Math.min(day,new Date(x.getFullYear(),x.getMonth()+1,0).getDate()));return x}
+function esc(v=""){return String(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))}function money(v){return Number(v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})}function longDate(s){return parseDate(s).toLocaleDateString("pt-BR",{day:"numeric",month:"long",year:"numeric"})}function weekDay(s){return parseDate(s).toLocaleDateString("pt-BR",{weekday:"long"})}function today(){return isoDate(new Date())}function inRange(d){return d>=state.rangeStart&&d<=state.rangeEnd}function memberName(id){return state.members.find(m=>m.user_id===id)?.display_name||"Sem responsável"}function memberColor(id){return state.members.find(m=>m.user_id===id)?.profile_color||"#df8f7c"}
+function toast(msg){const e=$("#toast");e.textContent=msg;e.classList.add("show");clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove("show"),2500)}function setSync(t){$("#syncStatus").textContent=t}function showOnly(id){["#authScreen","#boardScreen","#app"].forEach(x=>$(x).classList.add("hidden"));$(id).classList.remove("hidden")}function openDialog(id){const d=$(id);if(d&&!d.open)d.showModal()}function closeDialog(id){const d=$(id);if(d?.open)d.close()}
+function applyTheme(id){const t=THEMES.find(x=>x.id===id)||THEMES[0],r=document.documentElement,map={bg:"--bg",surface:"--surface",s2:"--surface-2",p:"--primary",pd:"--primary-dark",sec:"--secondary",a:"--accent",a2:"--accent-2",text:"--text",muted:"--muted",border:"--border",good:"--good",bad:"--bad",done:"--done",unexpected:"--unexpected"};Object.entries(t.v).forEach(([k,v])=>r.style.setProperty(map[k],v));localStorage.setItem("nosso_tempo_theme",t.id)}
+function renderThemes(){$("#themeOptions").innerHTML=THEMES.map(t=>`<button class="theme-choice" data-theme="${t.id}"><span class="swatches"><i style="background:${t.v.p}"></i><i style="background:${t.v.s2}"></i><i style="background:${t.v.a2}"></i></span>${t.name}</button>`).join("")}
+function defaultRange(){const n=new Date();state.rangeStart=isoDate(n);state.rangeEnd=isoDate(addMonths(n,1));$("#startDate").value=state.rangeStart;$("#endDate").value=state.rangeEnd;updateRangeLabel()}function updateRangeLabel(){if(!state.rangeStart)return;const s=parseDate(state.rangeStart),e=parseDate(state.rangeEnd),sm=s.toLocaleDateString("pt-BR",{month:"short"}).replace(".",""),em=e.toLocaleDateString("pt-BR",{month:"short"}).replace(".","");$("#mobileRangeTitle").textContent=`${s.getDate()} ${sm} — ${e.getDate()} ${em}`}
+function weatherIcon(c){if(c===0)return"☀️";if([1,2].includes(c))return"🌤️";if(c===3)return"☁️";if([45,48].includes(c))return"🌫️";if([51,53,55,56,57,61,63,65,66,67,80,81,82].includes(c))return"🌧️";if([71,73,75,77,85,86].includes(c))return"❄️";if([95,96,99].includes(c))return"⛈️";return"🌥️"}function weatherLabel(c){if(c===0)return"céu limpo";if([1,2].includes(c))return"poucas nuvens";if(c===3)return"nublado";if([45,48].includes(c))return"neblina";if([51,53,55,56,57].includes(c))return"garoa";if([61,63,65,66,67,80,81,82].includes(c))return"chuva";if([95,96,99].includes(c))return"trovoadas";return"tempo variável"}
+async function loadWeather(){state.weather.clear();const t=today(),max=isoDate(addDays(new Date(),15)),start=state.rangeStart<t?t:state.rangeStart,end=state.rangeEnd>max?max:state.rangeEnd;if(start>end){updateTodayWeather();renderCalendar();return}try{const q=new URLSearchParams({latitude:WEATHER_LAT,longitude:WEATHER_LON,daily:"weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max",timezone:"America/Sao_Paulo",start_date:start,end_date:end}),r=await fetch(`https://api.open-meteo.com/v1/forecast?${q}`),d=await r.json();(d.daily?.time||[]).forEach((date,i)=>state.weather.set(date,{code:d.daily.weather_code[i],max:Math.round(d.daily.temperature_2m_max[i]),min:Math.round(d.daily.temperature_2m_min[i]),precip:d.daily.precipitation_probability_max[i]??0}))}catch(e){console.warn(e)}updateTodayWeather();renderCalendar()}
+function updateTodayWeather(){const w=state.weather.get(today());if(!w){$("#todayWeatherIcon").textContent="🌥️";$("#todayWeatherTitle").textContent="Previsão indisponível";$("#todayWeatherText").textContent="O restante continua funcionando.";return}$("#todayWeatherIcon").textContent=weatherIcon(w.code);$("#todayWeatherTitle").textContent=`${w.max}° / ${w.min}° • ${weatherLabel(w.code)}`;$("#todayWeatherText").textContent=`${w.precip}% de chance de chuva hoje.`}
+function effectivePlanStatus(p){if(p.status==="done")return"done";if(p.status==="unexpected")return"unexpected";if(p.status==="skipped")return"missed";return p.plan_date<today()?"missed":"planned"}function effectiveTaskStatus(t){if(t.is_done)return"done";if(t.unforeseen)return"unexpected";return t.due_date&&t.due_date<today()?"missed":"planned"}function statusText(s){return({done:"Realizado",unexpected:"Imprevisto",missed:"Não realizado",planned:"Planejado"})[s]||s}
+function demoLoad(){const d=JSON.parse(localStorage.getItem("nosso_tempo_v3_demo")||"{}");state.user={id:"demo-user",email:"demo@local"};state.session={};state.board={id:"demo-board",name:"Nosso Tempo",join_code:"LOCAL"};state.boards=[state.board];state.members=d.members||[{user_id:"demo-user",display_name:"Você",profile_color:"#df8f7c",profile_note:""},{user_id:"demo-partner",display_name:"Outra pessoa",profile_color:"#8eabc9",profile_note:""}];for(const k of["plans","planChecklist","planParticipants","tasks","finance","petLogs","notices","noticeReads","availability"])state[k]=d[k]||[];state.pets=d.pets||[{id:"simba",name:"Simba",species:"gato",coat:"rajado",emoji:"🐯",sort_order:1},{id:"nala",name:"Nala",species:"gato",coat:"preto",emoji:"🐈‍⬛",sort_order:2},{id:"gris",name:"Gris",species:"gato",coat:"cinza",emoji:"🩶",sort_order:3},{id:"xayah",name:"Xayah",species:"gata",coat:"rajada",emoji:"🐯",sort_order:4}]}
+function demoSave(){localStorage.setItem("nosso_tempo_v3_demo",JSON.stringify({members:state.members,plans:state.plans,planChecklist:state.planChecklist,planParticipants:state.planParticipants,tasks:state.tasks,finance:state.finance,pets:state.pets,petLogs:state.petLogs,notices:state.notices,noticeReads:state.noticeReads,availability:state.availability}))}
+async function initOnline(){state.supabase=window.supabase.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});const{data}=await state.supabase.auth.getSession();state.session=data.session;state.user=data.session?.user||null;state.supabase.auth.onAuthStateChange((_e,s)=>{state.session=s;state.user=s?.user||null});if(!state.user){showOnly("#authScreen");return}await loadBoards()}
+async function loadBoards(){const{data:m,error}=await state.supabase.from("board_members").select("board_id,display_name").eq("user_id",state.user.id);if(error)return toast(error.message);if(!m?.length){state.boards=[];renderExistingBoards();showOnly("#boardScreen");return}const{data:b,error:be}=await state.supabase.from("boards").select("id,name,join_code,created_at").in("id",m.map(x=>x.board_id));if(be)return toast(be.message);state.boards=b||[];const last=localStorage.getItem("nosso_tempo_board_id"),chosen=state.boards.find(x=>x.id===last)||state.boards[0];if(chosen)await selectBoard(chosen);else{renderExistingBoards();showOnly("#boardScreen")}}
+async function selectBoard(board){state.board=board;localStorage.setItem("nosso_tempo_board_id",board.id);const petRes=await state.supabase.rpc("ensure_default_pets",{p_board_id:board.id});if(petRes.error&&/function .* does not exist/i.test(petRes.error.message||""))toast("Rode MIGRACAO_V3.sql antes de usar esta versão.");await refreshAll(true);subscribeRealtime();enterApp()}
+async function safeQuery(name,promise){const{data,error}=await promise;if(error){console.error(name,error);if(/does not exist/i.test(error.message||""))toast("Rode o arquivo MIGRACAO_V3.sql no Supabase.");return[]}return data||[]}
+async function refreshAll(first=false){if(state.mode==="demo"){demoLoad();renderAll();return}if(!state.board)return;setSync("sincronizando...");const id=state.board.id;const [members,plans,planChecklist,planParticipants,tasks,finance,pets,petLogs,notices,noticeReads,availability]=await Promise.all([
+safeQuery("members",state.supabase.from("board_members").select("user_id,display_name,joined_at,profile_color,profile_note").eq("board_id",id).order("joined_at")),safeQuery("plans",state.supabase.from("day_plans").select("*").eq("board_id",id).order("plan_date").order("start_time")),safeQuery("checklist",state.supabase.from("plan_checklist_items").select("*").eq("board_id",id).order("position")),safeQuery("participants",state.supabase.from("plan_participants").select("*").eq("board_id",id)),safeQuery("tasks",state.supabase.from("shared_tasks").select("*").eq("board_id",id).order("created_at",{ascending:false})),safeQuery("finance",state.supabase.from("finance_entries").select("*").eq("board_id",id).order("entry_date",{ascending:false})),safeQuery("pets",state.supabase.from("pets").select("*").eq("board_id",id).order("sort_order")),safeQuery("petLogs",state.supabase.from("pet_care_logs").select("*").eq("board_id",id)),safeQuery("notices",state.supabase.from("notices").select("*").eq("board_id",id).order("created_at",{ascending:false})),safeQuery("reads",state.supabase.from("notice_reads").select("*").eq("board_id",id)),safeQuery("availability",state.supabase.from("availability_blocks").select("*").eq("board_id",id).order("start_time"))]);Object.assign(state,{members,plans,planChecklist,planParticipants,tasks,finance,pets,petLogs,notices,noticeReads,availability});setSync("sincronizado agora");renderAll();if(first)setTimeout(showUnreadNotices,300)}
+function subscribeRealtime(){if(state.mode!=="online"||!state.board)return;if(state.realtimeChannel)state.supabase.removeChannel(state.realtimeChannel);const ch=state.supabase.channel(`v3-${state.board.id}`);for(const table of["day_plans","shared_tasks","finance_entries","pet_care_logs","notices","notice_reads","availability_blocks","plan_checklist_items","plan_participants","board_members"]){ch.on("postgres_changes",{event:"*",schema:"public",table,filter:`board_id=eq.${state.board.id}`},async payload=>{const isNewNotice=table==="notices"&&payload.eventType==="INSERT"&&payload.new?.created_by!==state.user.id;await refreshAll(false);if(isNewNotice){toast(`💌 Novo recado: ${payload.new.title}`);if("Notification"in window&&Notification.permission==="granted")new Notification("Nosso Tempo 💌",{body:payload.new.title});showUnreadNotices()}})}state.realtimeChannel=ch.subscribe()}
+function enterApp(){$("#appTitle").textContent=state.board?.name||"Nosso Tempo";$("#inviteCode").textContent=state.board?.join_code||"LOCAL";showOnly("#app");renderAll();loadWeather();if(state.mode==="demo")$("#demoBanner").classList.remove("hidden")}
+function renderAll(){renderChooserOptions();renderCalendar();renderTasks();renderFinance();renderPets();renderNotices();renderSummary();renderProfile();updateNoticeBadge()}
+function renderExistingBoards(){$("#existingBoards").innerHTML=state.boards.length?`<p class="eyebrow">SUAS AGENDAS</p>`+state.boards.map(b=>`<button class="existing-board" data-board-id="${b.id}"><span><strong>${esc(b.name)}</strong><br><small class="muted">código ${esc(b.join_code)}</small></span><span>→</span></button>`).join(""):""}
+function renderChooserOptions(){const o=state.members.map(m=>`<option value="${m.user_id}">${esc(m.display_name)}</option>`).join("");$("#chooserSelect").innerHTML=`<option value="">Ainda não definido</option>${o}`;$("#taskAssignedTo").innerHTML=`<option value="">Qualquer um</option>${o}`}
+function getRangeDates(s,e){const a=[];let d=parseDate(s),last=parseDate(e),g=0;while(d<=last&&g<370){a.push(isoDate(d));d=addDays(d,1);g++}return a}function plansOn(date){return state.plans.filter(p=>p.plan_date===date).sort((a,b)=>(a.start_time||"99:99").localeCompare(b.start_time||"99:99"))}
+function renderCalendar(){if(!state.rangeStart)return;updateRangeLabel();const dates=getRangeDates(state.rangeStart,state.rangeEnd),first=parseDate(state.rangeStart),blanks=(first.getDay()+6)%7;let html=Array.from({length:blanks},()=>`<div class="blank-day"></div>`).join("");for(const date of dates){const d=parseDate(date),w=state.weather.get(date),plans=plansOn(date),show=plans.slice(0,4);html+=`<article class="day-card ${date===today()?"today":""}" data-date="${date}"><div class="day-head"><span class="day-number"><strong>${d.getDate()}</strong><small>${d.toLocaleDateString("pt-BR",{weekday:"short"}).replace(".","")}</small></span>${w?`<span class="weather-mini">${weatherIcon(w.code)} <span>${w.max}° • ${w.precip}%</span></span>`:`<span class="weather-mini">🗓️ <span>—</span></span>`}</div><div class="day-events">${show.map(p=>{const s=effectivePlanStatus(p),opt=p.selected_option==="bad"?p.bad_option:p.selected_option==="good"?p.good_option:(p.good_option||p.bad_option||"");return`<button class="event-chip ${s}" data-plan-id="${p.id}" style="border-left-color:${memberColor(p.chooser_user_id)}"><span class="event-topline">${p.start_time?String(p.start_time).slice(0,5):"sem hora"} • ${esc(memberName(p.chooser_user_id))}</span><span class="event-title">${s==="done"?"✓ ":s==="unexpected"?"⚡ ":s==="missed"?"○ ":""}${esc(p.title||p.category||"Atividade")}</span>${opt?`<span class="event-option">${esc(opt)}</span>`:""}</button>`}).join("")}${plans.length>4?`<span class="more-events">+${plans.length-4} atividade(s)</span>`:""}${plans.length===0?`<div class="empty-day">Clique para adicionar.</div>`:""}</div></article>`}$("#calendarGrid").innerHTML=html;const ranged=state.plans.filter(p=>inRange(p.plan_date)),done=ranged.filter(p=>effectivePlanStatus(p)==="done").length,pending=ranged.filter(p=>effectivePlanStatus(p)==="planned").length,missed=ranged.filter(p=>effectivePlanStatus(p)==="missed").length;$("#calendarQuickStat").textContent=`${done} realizados • ${pending} pendentes`;$("#calendarQuickSub").textContent=missed?`${missed} não realizado(s) no período.`:"Tudo em dia até agora."}
+function openDay(date){state.activeDate=date;$("#dayDialogWeekday").textContent=weekDay(date).toUpperCase();$("#dayDialogDate").textContent=longDate(date);const w=state.weather.get(date);$("#dayDialogWeather").innerHTML=w?`${weatherIcon(w.code)} <strong>${w.max}° / ${w.min}°</strong> • ${w.precip}% chuva • ${esc(weatherLabel(w.code))}`:`🗓️ Previsão ainda não disponível.`;const plans=plansOn(date);$("#dayPlanList").innerHTML=plans.length?plans.map(p=>{const s=effectivePlanStatus(p);return`<article class="day-plan-card"><button class="circle-check ${s==="done"?"checked":s==="unexpected"?"unexpected":""}" data-quick-plan-done="${p.id}" title="Marcar realizado">${s==="done"?"✓":s==="unexpected"?"⚡":""}</button><div class="plan-copy"><div class="plan-title">${esc(p.title||"Atividade")}</div><div class="plan-meta">${p.start_time?String(p.start_time).slice(0,5)+" • ":""}${esc(p.category||"")} • ${statusText(s)}</div></div><button class="edit-plan" data-edit-plan="${p.id}">Editar</button></article>`}).join(""):`<div class="panel muted">Nenhuma atividade ainda. Vocês podem colocar quantas quiserem neste dia.</div>`;openDialog("#dayDialog")}
+function participantIds(planId){const r=state.planParticipants.filter(x=>x.plan_id===planId);return r.length?r.map(x=>x.user_id):state.members.map(m=>m.user_id)}
+function openPlan(planId=null,date=state.activeDate||today()){const p=planId?state.plans.find(x=>x.id===planId):null;state.editingPlanId=planId;state.activeDate=p?.plan_date||date;$("#dialogWeekday").textContent=weekDay(state.activeDate).toUpperCase();$("#dialogDate").textContent=longDate(state.activeDate);const w=state.weather.get(state.activeDate);$("#dialogWeather").innerHTML=w?`${weatherIcon(w.code)} <strong>${w.max}° / ${w.min}°</strong> • ${w.precip}% de chuva • ${esc(weatherLabel(w.code))}`:`🗓️ Previsão ainda não disponível.`;$("#planTitle").value=p?.title||"";$("#chooserSelect").value=p?.chooser_user_id||"";$("#category").value=p?.category||"💛 Tempo juntos";$("#goodOption").value=p?.good_option||"";$("#badOption").value=p?.bad_option||"";$("#planTime").value=p?.start_time?String(p.start_time).slice(0,5):"";$("#selectedOption").value=p?.selected_option||"auto";$("#notes").value=p?.notes||"";$("#incidentReason").value=p?.incident_reason||"";$("#activityDone").checked=p?.status==="done";$("#activityUnexpected").checked=p?.status==="unexpected";toggleIncident();let rem="";if(p?.reminder_at){const dt=new Date(p.reminder_at),local=new Date(dt.getTime()-dt.getTimezoneOffset()*60000);rem=local.toISOString().slice(0,16)}$("#reminderAt").value=rem;const selected=new Set(p?participantIds(p.id):state.members.map(m=>m.user_id));$("#participantChecks").innerHTML=state.members.map(m=>`<label class="participant-pill"><input type="checkbox" data-participant="${m.user_id}" ${selected.has(m.user_id)?"checked":""}/><span class="member-color" style="background:${esc(m.profile_color||"#df8f7c")}"></span>${esc(m.display_name)}</label>`).join("");state.editChecklist=p?state.planChecklist.filter(x=>x.plan_id===p.id).map(x=>({...x})):[];renderPlanChecklist();updateAvailabilityWarning();$("#deletePlan").style.visibility=p?"visible":"hidden";closeDialog("#dayDialog");openDialog("#planDialog")}
+function renderPlanChecklist(){$("#planChecklistList").innerHTML=state.editChecklist.length?state.editChecklist.map((x,i)=>`<div class="mini-check-item"><input type="checkbox" data-plan-check="${i}" ${x.is_done?"checked":""}/><span>${esc(x.item_text)}</span><button type="button" data-remove-plan-check="${i}">×</button></div>`).join(""):`<p class="muted tiny">Sem subtarefas.</p>`}
+function toggleIncident(){$("#incidentReasonWrap").classList.toggle("hidden",!$("#activityUnexpected").checked);if($("#activityUnexpected").checked)$("#activityDone").checked=false}function getSelectedParticipants(){return $$('[data-participant]:checked').map(x=>x.dataset.participant)}function timeInBlock(time,b){return time>=String(b.start_time).slice(0,5)&&time<String(b.end_time).slice(0,5)}
+function availabilityFor(userId,date,time){if(!time)return{type:"unknown",text:"Escolha um horário para verificar."};const wd=parseDate(date).getDay(),all=state.availability.filter(b=>b.user_id===userId),specific=all.filter(b=>b.specific_date===date),regular=all.filter(b=>!b.specific_date&&Number(b.weekday)===wd),blocks=specific.length?specific:regular,busy=blocks.find(b=>b.availability_type==="busy"&&timeInBlock(time,b));if(busy)return{type:"busy",text:`ocupado: ${busy.label}`};const avail=blocks.filter(b=>b.availability_type==="available");if(avail.length){const yes=avail.find(b=>timeInBlock(time,b));return yes?{type:"available",text:`disponível: ${yes.label}`}:{type:"busy",text:"fora do horário marcado como disponível"}}if(!blocks.length)return{type:"unknown",text:"sem disponibilidade cadastrada"};return{type:"available",text:"sem conflito cadastrado"}}
+function updateAvailabilityWarning(){const time=$("#planTime").value,ids=getSelectedParticipants();$("#availabilityWarning").innerHTML=ids.map(id=>{const a=availabilityFor(id,state.activeDate,time);return`<div class="availability-status ${a.type}"><strong>${esc(memberName(id))}:</strong> ${esc(a.text)}</div>`}).join("")}
+async function savePlan(e){e.preventDefault();const status=$("#activityUnexpected").checked?"unexpected":$("#activityDone").checked?"done":"planned",payload={board_id:state.board.id,plan_date:state.activeDate,title:$("#planTitle").value.trim(),chooser_user_id:$("#chooserSelect").value||null,category:$("#category").value,good_option:$("#goodOption").value.trim()||null,bad_option:$("#badOption").value.trim()||null,start_time:$("#planTime").value||null,selected_option:$("#selectedOption").value,status,reminder_at:$("#reminderAt").value?new Date($("#reminderAt").value).toISOString():null,notes:$("#notes").value.trim()||null,incident_reason:$("#incidentReason").value.trim()||null,updated_by:state.user.id,updated_at:new Date().toISOString()};if(!payload.title)return toast("Dê um nome para a atividade.");let id=state.editingPlanId;if(state.mode==="demo"){if(id){Object.assign(state.plans.find(x=>x.id===id),payload)}else{id=crypto.randomUUID();state.plans.push({...payload,id,created_by:state.user.id,created_at:new Date().toISOString()})}state.planParticipants=state.planParticipants.filter(x=>x.plan_id!==id);getSelectedParticipants().forEach(uid=>state.planParticipants.push({board_id:state.board.id,plan_id:id,user_id:uid}));state.planChecklist=state.planChecklist.filter(x=>x.plan_id!==id);state.editChecklist.forEach((x,i)=>state.planChecklist.push({id:crypto.randomUUID(),board_id:state.board.id,plan_id:id,item_text:x.item_text,is_done:x.is_done,position:i,done_by:x.is_done?state.user.id:null,done_at:x.is_done?new Date().toISOString():null}));demoSave()}else{let res;if(id)res=await state.supabase.from("day_plans").update(payload).eq("id",id).eq("board_id",state.board.id).select().single();else res=await state.supabase.from("day_plans").insert({...payload,created_by:state.user.id}).select().single();if(res.error)return toast(res.error.message);id=res.data.id;await state.supabase.from("plan_participants").delete().eq("board_id",state.board.id).eq("plan_id",id);const parts=getSelectedParticipants();if(parts.length)await state.supabase.from("plan_participants").insert(parts.map(uid=>({board_id:state.board.id,plan_id:id,user_id:uid})));await state.supabase.from("plan_checklist_items").delete().eq("board_id",state.board.id).eq("plan_id",id);if(state.editChecklist.length)await state.supabase.from("plan_checklist_items").insert(state.editChecklist.map((x,i)=>({board_id:state.board.id,plan_id:id,item_text:x.item_text,is_done:x.is_done,position:i,done_by:x.is_done?state.user.id:null,done_at:x.is_done?new Date().toISOString():null})));await refreshAll(false)}closeDialog("#planDialog");renderAll();toast("Atividade salva ♡")}
+async function deletePlan(){const id=state.editingPlanId;if(!id)return;if(state.mode==="demo"){state.plans=state.plans.filter(x=>x.id!==id);state.planChecklist=state.planChecklist.filter(x=>x.plan_id!==id);state.planParticipants=state.planParticipants.filter(x=>x.plan_id!==id);demoSave()}else{const{error}=await state.supabase.from("day_plans").delete().eq("id",id).eq("board_id",state.board.id);if(error)return toast(error.message);await refreshAll(false)}closeDialog("#planDialog");renderAll();toast("Atividade excluída.")}
+async function quickTogglePlan(id){const p=state.plans.find(x=>x.id===id);if(!p)return;const next=p.status==="done"?"planned":"done";if(state.mode==="demo"){p.status=next;demoSave();renderAll();openDay(p.plan_date)}else{await state.supabase.from("day_plans").update({status:next,updated_by:state.user.id,updated_at:new Date().toISOString()}).eq("id",id);await refreshAll(false);openDay(p.plan_date)}}
+function renderTasks(){const c={done:0,missed:0,unexpected:0,planned:0};state.tasks.forEach(t=>c[effectiveTaskStatus(t)]++);$("#taskSummaryCards").innerHTML=[["✅","Realizadas",c.done,"goodish"],["○","Não realizadas",c.missed,"badish"],["⚡","Imprevistos",c.unexpected,"warnish"],["🗓️","Pendentes",c.planned,""]].map(x=>`<article class="metric-card ${x[3]}"><span class="metric-icon">${x[0]}</span><strong>${x[2]}</strong><small>${x[1]}</small></article>`).join("");let list=[...state.tasks],f=state.taskFilter;if(f==="today")list=list.filter(t=>t.due_date===today());else if(f!=="all")list=list.filter(t=>effectiveTaskStatus(t)===f);list.sort((a,b)=>(a.due_date||"9999").localeCompare(b.due_date||"9999"));$("#taskList").innerHTML=list.length?list.map(t=>{const s=effectiveTaskStatus(t);return`<article class="list-card"><button class="circle-check ${s==="done"?"checked":s==="unexpected"?"unexpected":""}" data-task-toggle="${t.id}">${s==="done"?"✓":s==="unexpected"?"⚡":""}</button><div class="list-card-main"><div class="list-card-title">${esc(t.title)}</div><div class="list-card-meta"><span>${esc(t.category)}</span>${t.due_date?`<span>📅 ${new Date(t.due_date+"T12:00").toLocaleDateString("pt-BR")}</span>`:""}${t.assigned_to?`<span>👤 ${esc(memberName(t.assigned_to))}</span>`:""}<span class="status-label ${s}">${statusText(s)}</span></div></div><div class="list-actions"><button class="icon-mini" data-task-unexpected="${t.id}">⚡</button><button class="icon-mini" data-edit-task="${t.id}">✎</button></div></article>`}).join(""):`<div class="panel muted">Nenhuma tarefa nessa categoria.</div>`}
+function openTask(id=null){state.editingTaskId=id;const t=id?state.tasks.find(x=>x.id===id):null;$("#taskDialogTitle").textContent=t?"Editar tarefa":"Nova tarefa";$("#taskTitle").value=t?.title||"";$("#taskCategory").value=t?.category||"🏠 Casa";$("#taskDueDate").value=t?.due_date||today();$("#taskAssignedTo").value=t?.assigned_to||"";$("#taskNotes").value=t?.notes||"";$("#taskDone").checked=!!t?.is_done;$("#taskUnexpected").checked=!!t?.unforeseen;$("#deleteTask").style.visibility=t?"visible":"hidden";openDialog("#taskDialog")}
+async function saveTask(e){e.preventDefault();const payload={board_id:state.board.id,title:$("#taskTitle").value.trim(),category:$("#taskCategory").value,due_date:$("#taskDueDate").value||null,assigned_to:$("#taskAssignedTo").value||null,is_done:$("#taskDone").checked,unforeseen:$("#taskUnexpected").checked,notes:$("#taskNotes").value.trim()||null,completed_at:$("#taskDone").checked?new Date().toISOString():null,updated_at:new Date().toISOString()};if(state.mode==="demo"){if(state.editingTaskId)Object.assign(state.tasks.find(x=>x.id===state.editingTaskId),payload);else state.tasks.push({...payload,id:crypto.randomUUID(),created_by:state.user.id,created_at:new Date().toISOString()});demoSave()}else{const q=state.editingTaskId?state.supabase.from("shared_tasks").update(payload).eq("id",state.editingTaskId):state.supabase.from("shared_tasks").insert({...payload,created_by:state.user.id}),{error}=await q;if(error)return toast(error.message);await refreshAll(false)}closeDialog("#taskDialog");renderAll();toast("Tarefa salva.")}
+async function toggleTask(id,mode="done"){const t=state.tasks.find(x=>x.id===id);if(!t)return;const patch=mode==="unexpected"?{unforeseen:!t.unforeseen,is_done:false}:{is_done:!t.is_done,unforeseen:false,completed_at:!t.is_done?new Date().toISOString():null};if(state.mode==="demo"){Object.assign(t,patch);demoSave();renderAll()}else{await state.supabase.from("shared_tasks").update({...patch,updated_at:new Date().toISOString()}).eq("id",id);await refreshAll(false)}}
+async function deleteTask(){const id=state.editingTaskId;if(!id)return;if(state.mode==="demo"){state.tasks=state.tasks.filter(x=>x.id!==id);demoSave()}else{await state.supabase.from("shared_tasks").delete().eq("id",id);await refreshAll(false)}closeDialog("#taskDialog");renderAll()}
+function financeTotals(){const inc=state.finance.filter(x=>x.kind==="income"),exp=state.finance.filter(x=>x.kind==="expense"),received=inc.filter(x=>x.is_paid).reduce((a,x)=>a+Number(x.amount),0),spent=exp.filter(x=>x.is_paid).reduce((a,x)=>a+Number(x.amount),0),pending=exp.filter(x=>!x.is_paid).reduce((a,x)=>a+Number(x.amount),0);return{received,spent,pending,current:received-spent,projected:received-spent-pending}}
+function renderFinance(){const t=financeTotals();$("#financeMetrics").innerHTML=[["💵","Entradas recebidas",money(t.received),"money"],["🧾","Gastos pagos",money(t.spent),"badish"],["⏳","Ainda pendente",money(t.pending),"warnish"],["✨","Sobra atual",money(t.current),t.current>=0?"goodish":"badish"]].map(x=>`<article class="metric-card ${x[3]}"><span>${x[0]}</span><strong>${x[2]}</strong><small>${x[1]}</small></article>`).join("");const f=$("#financeFilter")?.value||"all";let list=[...state.finance];if(f==="pending")list=list.filter(x=>!x.is_paid);if(f==="paid")list=list.filter(x=>x.is_paid);if(f==="expense")list=list.filter(x=>x.kind==="expense");if(f==="income")list=list.filter(x=>x.kind==="income");$("#financeList").innerHTML=list.length?list.map(x=>`<article class="list-card finance-row ${x.kind}"><button class="circle-check ${x.is_paid?"checked":""}" data-finance-paid="${x.id}">${x.is_paid?"✓":""}</button><div class="list-card-main"><div class="list-card-title">${esc(x.title)}</div><div class="list-card-meta"><span>${esc(x.category)}</span><span>📅 ${new Date(x.entry_date+"T12:00").toLocaleDateString("pt-BR")}</span><span>${x.is_paid?"pago/comprado":"pendente"}</span></div></div><div class="amount">${x.kind==="income"?"+":"−"} ${money(x.amount)}</div><button class="icon-mini" data-edit-finance="${x.id}">✎</button></article>`).join(""):`<div class="muted">Sem lançamentos.</div>`}
+function openFinance(id=null){state.editingFinanceId=id;const x=id?state.finance.find(y=>y.id===id):null;$("#financeDialogTitle").textContent=x?"Editar lançamento":"Novo lançamento";$("#financeKind").value=x?.kind||"expense";$("#financeAmount").value=x?.amount||"";$("#financeTitle").value=x?.title||"";$("#financeCategory").value=x?.category||"🛒 Mercado";$("#financeDate").value=x?.entry_date||today();$("#financePaid").checked=!!x?.is_paid;$("#financeNotes").value=x?.notes||"";$("#deleteFinance").style.visibility=x?"visible":"hidden";openDialog("#financeDialog")}
+async function saveFinance(e){e.preventDefault();const payload={board_id:state.board.id,kind:$("#financeKind").value,amount:Number($("#financeAmount").value),title:$("#financeTitle").value.trim(),category:$("#financeCategory").value,entry_date:$("#financeDate").value,is_paid:$("#financePaid").checked,notes:$("#financeNotes").value.trim()||null,updated_at:new Date().toISOString()};if(state.mode==="demo"){if(state.editingFinanceId)Object.assign(state.finance.find(x=>x.id===state.editingFinanceId),payload);else state.finance.push({...payload,id:crypto.randomUUID(),created_by:state.user.id,created_at:new Date().toISOString()});demoSave()}else{const q=state.editingFinanceId?state.supabase.from("finance_entries").update(payload).eq("id",state.editingFinanceId):state.supabase.from("finance_entries").insert({...payload,created_by:state.user.id}),{error}=await q;if(error)return toast(error.message);await refreshAll(false)}closeDialog("#financeDialog");renderAll();toast("Lançamento salvo.")}
+async function toggleFinancePaid(id){const x=state.finance.find(y=>y.id===id);if(!x)return;if(state.mode==="demo"){x.is_paid=!x.is_paid;demoSave();renderAll()}else{await state.supabase.from("finance_entries").update({is_paid:!x.is_paid,updated_at:new Date().toISOString()}).eq("id",id);await refreshAll(false)}}async function deleteFinance(){const id=state.editingFinanceId;if(!id)return;if(state.mode==="demo"){state.finance=state.finance.filter(x=>x.id!==id);demoSave()}else{await state.supabase.from("finance_entries").delete().eq("id",id);await refreshAll(false)}closeDialog("#financeDialog");renderAll()}
+function petTaskTypes(pet,date){return[...new Set([...PET_DEFAULT_TASKS,...state.petLogs.filter(x=>x.pet_id===pet.id&&x.care_date===date).map(x=>x.task_type)])]}function petLog(petId,date,type){return state.petLogs.find(x=>x.pet_id===petId&&x.care_date===date&&x.task_type===type)}
+function renderPets(){const date=$("#petDate")?.value||today();if($("#petDate")&&!$("#petDate").value)$("#petDate").value=date;const doneToday=state.pets.reduce((a,p)=>a+PET_DEFAULT_TASKS.filter(t=>petLog(p.id,date,t)?.is_done).length,0),expected=state.pets.length*PET_DEFAULT_TASKS.length,sevenStart=isoDate(addDays(new Date(),-6)),done7=state.petLogs.filter(x=>x.care_date>=sevenStart&&x.care_date<=today()&&PET_DEFAULT_TASKS.includes(x.task_type)&&x.is_done).length,expected7=state.pets.length*PET_DEFAULT_TASKS.length*7;$("#petMetrics").innerHTML=[["🐾","Cuidados marcados hoje",`${doneToday}/${expected}`,"goodish"],["📈","Últimos 7 dias",expected7?`${Math.round(done7/expected7*100)}%`:"0%",""],["🐱","Pets",state.pets.length,""],["💛","Meta","constância, não perfeição","warnish"]].map(x=>`<article class="metric-card ${x[3]}"><span>${x[0]}</span><strong>${x[2]}</strong><small>${x[1]}</small></article>`).join("");$("#petGrid").innerHTML=state.pets.map(p=>`<article class="pet-card"><div class="pet-head"><div class="pet-avatar">${p.emoji||"🐱"}</div><div><h3>${esc(p.name)}</h3><small>${esc(p.species)} • ${esc(p.coat||"")}</small></div></div><div class="pet-care-list">${petTaskTypes(p,date).map(type=>{const l=petLog(p.id,date,type);return`<button class="care-toggle ${l?.is_done?"done":""}" data-pet-care="${p.id}" data-care-type="${esc(type)}">${l?.is_done?"✓ ":""}${esc(type)}</button>`}).join("")}</div><div class="pet-add-care"><input data-pet-custom-input="${p.id}" placeholder="Outro cuidado..." maxlength="60"/><button class="btn secondary" data-add-pet-care="${p.id}">+</button></div></article>`).join("")}
+async function togglePetCare(petId,type){const date=$("#petDate").value||today(),l=petLog(petId,date,type),next=!l?.is_done;if(state.mode==="demo"){if(l)l.is_done=next;else state.petLogs.push({id:crypto.randomUUID(),board_id:state.board.id,pet_id:petId,care_date:date,task_type:type,is_done:true,done_by:state.user.id,done_at:new Date().toISOString()});demoSave();renderPets();renderSummary()}else{if(l)await state.supabase.from("pet_care_logs").update({is_done:next,done_by:next?state.user.id:null,done_at:next?new Date().toISOString():null}).eq("id",l.id);else await state.supabase.from("pet_care_logs").insert({board_id:state.board.id,pet_id:petId,care_date:date,task_type:type,is_done:true,done_by:state.user.id,done_at:new Date().toISOString()});await refreshAll(false)}}
+async function addCustomPetCare(petId){const input=$(`[data-pet-custom-input="${petId}"]`),type=input.value.trim();if(!type)return;const date=$("#petDate").value||today();if(state.mode==="demo"){state.petLogs.push({id:crypto.randomUUID(),board_id:state.board.id,pet_id:petId,care_date:date,task_type:type,is_done:false});demoSave();renderPets()}else{const{error}=await state.supabase.from("pet_care_logs").upsert({board_id:state.board.id,pet_id:petId,care_date:date,task_type:type,is_done:false},{onConflict:"pet_id,care_date,task_type"});if(error)return toast(error.message);await refreshAll(false)}input.value=""}
+function isNoticeRead(id){return state.noticeReads.some(x=>x.notice_id===id&&x.user_id===state.user.id)}function activeNotices(){return state.notices.filter(n=>!n.expires_at||n.expires_at>=today())}function unreadNotices(){return activeNotices().filter(n=>n.created_by!==state.user.id&&!isNoticeRead(n.id))}function updateNoticeBadge(){const n=unreadNotices().length;$("#noticeBadge").textContent=n;$("#noticeBadge").classList.toggle("hidden",!n)}
+function renderNotices(){const list=activeNotices();$("#noticeList").innerHTML=list.length?list.map(n=>`<article class="notice-card ${n.priority==="important"?"important":""} ${!isNoticeRead(n.id)&&n.created_by!==state.user.id?"unread":""}"><p class="eyebrow">${n.priority==="important"?"IMPORTANTE":"RECADO"}</p><h3>${esc(n.title)}</h3><p>${esc(n.body)}</p><div class="notice-meta"><span>por ${esc(memberName(n.created_by))} • ${new Date(n.created_at).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}</span>${n.created_by!==state.user.id&&!isNoticeRead(n.id)?`<button class="small-btn" data-read-notice="${n.id}">Marcar lido</button>`:""}</div></article>`).join(""):`<div class="panel muted">Nenhum recado ativo.</div>`;updateNoticeBadge()}
+function openNotice(){$("#noticeForm").reset();openDialog("#noticeDialog")}async function saveNotice(e){e.preventDefault();const payload={board_id:state.board.id,title:$("#noticeTitle").value.trim(),body:$("#noticeBody").value.trim(),priority:$("#noticePriority").value,expires_at:$("#noticeExpires").value||null,created_by:state.user.id};if(state.mode==="demo"){state.notices.unshift({...payload,id:crypto.randomUUID(),created_at:new Date().toISOString()});demoSave()}else{const{error}=await state.supabase.from("notices").insert(payload);if(error)return toast(error.message);await refreshAll(false)}closeDialog("#noticeDialog");renderNotices();toast("Recado publicado 💌")}
+async function markNoticeRead(id){if(state.mode==="demo"){if(!isNoticeRead(id))state.noticeReads.push({board_id:state.board.id,notice_id:id,user_id:state.user.id,read_at:new Date().toISOString()});demoSave();renderAll()}else{await state.supabase.from("notice_reads").upsert({board_id:state.board.id,notice_id:id,user_id:state.user.id,read_at:new Date().toISOString()},{onConflict:"notice_id,user_id"});await refreshAll(false)}}function showUnreadNotices(){const list=unreadNotices();if(!list.length)return;$("#unreadNoticeList").innerHTML=list.map(n=>`<article class="notice-card ${n.priority==="important"?"important":""}"><p class="eyebrow">${n.priority==="important"?"IMPORTANTE":"RECADO"}</p><h3>${esc(n.title)}</h3><p>${esc(n.body)}</p><small class="muted">por ${esc(memberName(n.created_by))}</small></article>`).join("");openDialog("#unreadDialog")}async function markAllNoticesRead(){for(const n of unreadNotices())await markNoticeRead(n.id);closeDialog("#unreadDialog")}
+function breakdown(rows){return rows.map(([a,b])=>`<div class="breakdown-row"><span class="muted">${a}</span><strong>${b}</strong></div>`).join("")}
+function renderSummary(){const ranged=state.plans.filter(p=>inRange(p.plan_date)),pc={done:0,missed:0,unexpected:0,planned:0};ranged.forEach(p=>pc[effectivePlanStatus(p)]++);const tc={done:0,missed:0,unexpected:0,planned:0};state.tasks.forEach(t=>tc[effectiveTaskStatus(t)]++);const t=financeTotals(),sevenStart=isoDate(addDays(new Date(),-6)),petDone=state.petLogs.filter(x=>x.care_date>=sevenStart&&x.care_date<=today()&&PET_DEFAULT_TASKS.includes(x.task_type)&&x.is_done).length,petExpected=state.pets.length*PET_DEFAULT_TASKS.length*7,activityDen=pc.done+pc.missed,ar=activityDen?Math.round(pc.done/activityDen*100):100,taskDen=tc.done+tc.missed,tr=taskDen?Math.round(tc.done/taskDen*100):100,pr=petExpected?Math.round(petDone/petExpected*100):0;$("#summaryMetrics").innerHTML=[["✅","Atividades realizadas",pc.done,"goodish"],["○","Não realizadas",pc.missed,"badish"],["⚡","Imprevistos",pc.unexpected,"warnish"],["✨","Sobra atual",money(t.current),t.current>=0?"money":"badish"]].map(x=>`<article class="metric-card ${x[3]}"><span>${x[0]}</span><strong>${x[2]}</strong><small>${x[1]}</small></article>`).join("");$("#activityRate").textContent=`${ar}%`;$("#activityProgress").style.width=`${ar}%`;$("#activityBreakdown").innerHTML=breakdown([["Realizados",pc.done],["Não realizados",pc.missed],["Imprevistos",pc.unexpected],["Planejados",pc.planned]]);$("#taskRate").textContent=`${tr}%`;$("#taskProgress").style.width=`${tr}%`;$("#taskBreakdown").innerHTML=breakdown([["Realizadas",tc.done],["Não realizadas",tc.missed],["Imprevistos",tc.unexpected],["Pendentes",tc.planned]]);$("#petRate").textContent=`${pr}%`;$("#petProgress").style.width=`${pr}%`;$("#petBreakdown").innerHTML=breakdown([["Cuidados marcados",petDone],["Cuidados esperados",petExpected],["Pets",state.pets.length]]);$("#financeBreakdown").innerHTML=breakdown([["Entradas recebidas",money(t.received)],["Gastos pagos",money(t.spent)],["Pendentes",money(t.pending)],["Sobra após pendentes",money(t.projected)]])}
+function renderProfile(){const me=state.members.find(m=>m.user_id===state.user?.id);if(me){$("#profileName").value=me.display_name||"";$("#profileColor").value=me.profile_color||"#df8f7c";$("#profileNote").value=me.profile_note||""}const mine=state.availability.filter(x=>x.user_id===state.user?.id).sort((a,b)=>(a.specific_date||String(a.weekday)).localeCompare(b.specific_date||String(b.weekday))||(a.start_time||"").localeCompare(b.start_time||""));$("#availabilityList").innerHTML=mine.length?mine.map(b=>`<div class="availability-row ${b.availability_type}"><div class="availability-copy"><strong>${b.specific_date?new Date(b.specific_date+"T12:00").toLocaleDateString("pt-BR"):WEEKDAYS[b.weekday]}</strong> • ${String(b.start_time).slice(0,5)}–${String(b.end_time).slice(0,5)}<br><small class="muted">${b.availability_type==="busy"?"Ocupado":"Disponível"}: ${esc(b.label)}</small></div><button class="icon-mini" data-delete-availability="${b.id}">×</button></div>`).join(""):`<p class="muted tiny">Nenhum horário cadastrado ainda.</p>`;$("#memberProfiles").innerHTML=state.members.map(m=>`<article class="member-profile"><div class="member-name-line"><span class="member-color" style="background:${esc(m.profile_color||"#df8f7c")}"></span>${esc(m.display_name)}</div><p class="muted tiny">${esc(m.profile_note||"Sem recado no perfil.")}</p><small class="muted">${state.availability.filter(x=>x.user_id===m.user_id).length} horário(s) cadastrado(s)</small></article>`).join("")}
+async function saveProfile(e){e.preventDefault();const name=$("#profileName").value.trim(),color=$("#profileColor").value,note=$("#profileNote").value.trim();if(state.mode==="demo"){Object.assign(state.members.find(m=>m.user_id===state.user.id),{display_name:name,profile_color:color,profile_note:note});demoSave();renderAll()}else{const{error}=await state.supabase.rpc("update_my_profile",{p_board_id:state.board.id,p_display_name:name,p_profile_color:color,p_profile_note:note});if(error)return toast(error.message);await refreshAll(false)}toast("Perfil atualizado.")}
+async function saveAvailability(e){e.preventDefault();const payload={board_id:state.board.id,user_id:state.user.id,weekday:Number($("#availabilityWeekday").value),specific_date:$("#availabilityDate").value||null,start_time:$("#availabilityStart").value,end_time:$("#availabilityEnd").value,availability_type:$("#availabilityType").value,label:$("#availabilityLabel").value.trim()};if(payload.end_time<=payload.start_time)return toast("O horário final precisa ser depois do inicial.");if(state.mode==="demo"){state.availability.push({...payload,id:crypto.randomUUID()});demoSave();renderProfile()}else{const{error}=await state.supabase.from("availability_blocks").insert(payload);if(error)return toast(error.message);await refreshAll(false)}$("#availabilityLabel").value="";$("#availabilityDate").value="";toast("Horário adicionado.")}
+async function deleteAvailability(id){if(state.mode==="demo"){state.availability=state.availability.filter(x=>x.id!==id);demoSave();renderProfile()}else{await state.supabase.from("availability_blocks").delete().eq("id",id);await refreshAll(false)}}
+function setPage(page){state.page=page;$$('[data-app-page]').forEach(x=>x.classList.toggle("active",x.dataset.appPage===page));$$('[data-page]').forEach(x=>x.classList.toggle("active",x.dataset.page===page));$("#mobileFab").classList.toggle("hidden",page!=="calendar");if(page==="notices")renderNotices();if(page==="summary")renderSummary();if(page==="profile")renderProfile();window.scrollTo({top:0,behavior:"smooth"})}
+async function applyRange(start,end){state.rangeStart=start;state.rangeEnd=end;$("#startDate").value=start;$("#endDate").value=end;updateRangeLabel();renderCalendar();renderSummary();await loadWeather()}async function shiftPeriod(n){await applyRange(isoDate(addMonths(parseDate(state.rangeStart),n)),isoDate(addMonths(parseDate(state.rangeEnd),n)))}
+function downloadICS(){const date=(state.activeDate||today()).replaceAll("-",""),time=($("#planTime").value||"19:00").replace(":","")+"00",title=($("#planTitle").value||"Nosso Tempo").replace(/,/g,"\\,"),desc=(($("#goodOption").value?`Tempo bom: ${$("#goodOption").value}. `:"")+($("#badOption").value?`Tempo ruim: ${$("#badOption").value}.`:"")).replace(/,/g,"\\,"),ics=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//Nosso Tempo//PT-BR","BEGIN:VEVENT",`UID:${crypto.randomUUID()}@nosso-tempo`,`DTSTART;TZID=America/Sao_Paulo:${date}T${time}`,`SUMMARY:${title}`,`DESCRIPTION:${desc}`,"BEGIN:VALARM","TRIGGER:-PT30M","ACTION:DISPLAY","DESCRIPTION:Lembrete Nosso Tempo","END:VALARM","END:VEVENT","END:VCALENDAR"].join("\r\n"),blob=new Blob([ics],{type:"text/calendar"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=`nosso-tempo-${state.activeDate}.ics`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
+async function requestNotifications(){if(!("Notification"in window))return toast("Este navegador não oferece notificações.");const r=await Notification.requestPermission();toast(r==="granted"?"Notificações ativadas.":"Notificações não autorizadas.")}
+function bindEvents(){
+  $$('.tab').forEach(b=>b.addEventListener('click',()=>{state.authMode=b.dataset.authTab;$$('.tab').forEach(x=>x.classList.toggle('active',x===b));$('#authSubmit').textContent=state.authMode==='login'?'Entrar':'Criar conta';$('#authHint').textContent=state.authMode==='signup'?'Talvez seja necessário confirmar o e-mail.':''}));
+  $('#authForm').addEventListener('submit',async e=>{e.preventDefault();const email=$('#authEmail').value.trim(),password=$('#authPassword').value;try{if(state.authMode==='signup'){const{data,error}=await state.supabase.auth.signUp({email,password});if(error)throw error;if(!data.session)return toast('Conta criada. Confirme seu e-mail e depois entre.');state.user=data.user;state.session=data.session}else{const{data,error}=await state.supabase.auth.signInWithPassword({email,password});if(error)throw error;state.user=data.user;state.session=data.session}await loadBoards()}catch(err){toast(err.message)}});
+  $('#createBoardForm').addEventListener('submit',async e=>{e.preventDefault();const{error}=await state.supabase.rpc('create_board',{p_name:$('#boardName').value.trim(),p_display_name:$('#creatorName').value.trim()});if(error)return toast(error.message);await loadBoards()});
+  $('#joinBoardForm').addEventListener('submit',async e=>{e.preventDefault();const{error}=await state.supabase.rpc('join_board',{p_join_code:$('#joinCode').value.trim(),p_display_name:$('#joinName').value.trim()});if(error)return toast(error.message);await loadBoards()});
+  $('#existingBoards').addEventListener('click',async e=>{const b=e.target.closest('[data-board-id]');if(b)await selectBoard(state.boards.find(x=>x.id===b.dataset.boardId))});
+  $('#boardLogout').addEventListener('click',async()=>{await state.supabase?.auth.signOut();showOnly('#authScreen')});
+  $('#appNav').addEventListener('click',e=>{const b=e.target.closest('[data-page]');if(b)setPage(b.dataset.page)});
+  $('#calendarGrid').addEventListener('click',e=>{const chip=e.target.closest('[data-plan-id]');if(chip){e.stopPropagation();openPlan(chip.dataset.planId);return}const day=e.target.closest('.day-card');if(day)openDay(day.dataset.date)});
+  $('#dayPlanList').addEventListener('click',e=>{const edit=e.target.closest('[data-edit-plan]');if(edit)return openPlan(edit.dataset.editPlan);const q=e.target.closest('[data-quick-plan-done]');if(q)return quickTogglePlan(q.dataset.quickPlanDone)});
+  $('#addPlanForDay').addEventListener('click',()=>openPlan(null,state.activeDate));$('#mobileFab').addEventListener('click',()=>openDay(inRange(today())?today():state.rangeStart));
+  $('#planForm').addEventListener('submit',savePlan);$('#closePlanDialog').addEventListener('click',()=>closeDialog('#planDialog'));$('#deletePlan').addEventListener('click',deletePlan);$('#downloadICS').addEventListener('click',downloadICS);
+  $('#activityUnexpected').addEventListener('change',toggleIncident);$('#activityDone').addEventListener('change',()=>{if($('#activityDone').checked)$('#activityUnexpected').checked=false;toggleIncident()});$('#planTime').addEventListener('change',updateAvailabilityWarning);$('#participantChecks').addEventListener('change',updateAvailabilityWarning);
+  $('#addPlanChecklistItem').addEventListener('click',()=>{const v=$('#newPlanChecklistText').value.trim();if(!v)return;state.editChecklist.push({item_text:v,is_done:false});$('#newPlanChecklistText').value='';renderPlanChecklist()});
+  $('#planChecklistList').addEventListener('click',e=>{const r=e.target.closest('[data-remove-plan-check]');if(r){state.editChecklist.splice(Number(r.dataset.removePlanCheck),1);renderPlanChecklist()}});$('#planChecklistList').addEventListener('change',e=>{if(e.target.matches('[data-plan-check]'))state.editChecklist[Number(e.target.dataset.planCheck)].is_done=e.target.checked});
+  $('#applyRange').addEventListener('click',async()=>{const s=$('#startDate').value,e=$('#endDate').value;if(!s||!e||s>e)return toast('Escolha um período válido.');if((parseDate(e)-parseDate(s))/86400000>365)return toast('Escolha até 1 ano.');await applyRange(s,e)});$('#prevPeriod').addEventListener('click',()=>shiftPeriod(-1));$('#nextPeriod').addEventListener('click',()=>shiftPeriod(1));$('#todayButton').addEventListener('click',()=>applyRange(today(),isoDate(addMonths(new Date(),1))));
+  $('#newTaskButton').addEventListener('click',()=>openTask());$('#taskForm').addEventListener('submit',saveTask);$('#deleteTask').addEventListener('click',deleteTask);$('.filter-row').addEventListener('click',e=>{const b=e.target.closest('[data-task-filter]');if(!b)return;state.taskFilter=b.dataset.taskFilter;$$('[data-task-filter]').forEach(x=>x.classList.toggle('active',x===b));renderTasks()});$('#taskList').addEventListener('click',e=>{const t=e.target.closest('[data-task-toggle]');if(t)return toggleTask(t.dataset.taskToggle);const u=e.target.closest('[data-task-unexpected]');if(u)return toggleTask(u.dataset.taskUnexpected,'unexpected');const ed=e.target.closest('[data-edit-task]');if(ed)return openTask(ed.dataset.editTask)});
+  $('#newFinanceButton').addEventListener('click',()=>openFinance());$('#financeForm').addEventListener('submit',saveFinance);$('#deleteFinance').addEventListener('click',deleteFinance);$('#financeFilter').addEventListener('change',renderFinance);$('#financeList').addEventListener('click',e=>{const p=e.target.closest('[data-finance-paid]');if(p)return toggleFinancePaid(p.dataset.financePaid);const ed=e.target.closest('[data-edit-finance]');if(ed)return openFinance(ed.dataset.editFinance)});
+  $('#petDate').value=today();$('#petDate').addEventListener('change',renderPets);$('#petGrid').addEventListener('click',e=>{const c=e.target.closest('[data-pet-care]');if(c)return togglePetCare(c.dataset.petCare,c.dataset.careType);const a=e.target.closest('[data-add-pet-care]');if(a)return addCustomPetCare(a.dataset.addPetCare)});
+  $('#newNoticeButton').addEventListener('click',openNotice);$('#noticeForm').addEventListener('submit',saveNotice);$('#noticeList').addEventListener('click',e=>{const b=e.target.closest('[data-read-notice]');if(b)markNoticeRead(b.dataset.readNotice)});$('#markAllNoticesRead').addEventListener('click',markAllNoticesRead);
+  $('#profileForm').addEventListener('submit',saveProfile);$('#availabilityForm').addEventListener('submit',saveAvailability);$('#availabilityList').addEventListener('click',e=>{const b=e.target.closest('[data-delete-availability]');if(b)deleteAvailability(b.dataset.deleteAvailability)});$('#enableNotifications').addEventListener('click',requestNotifications);
+  $('#themeButton').addEventListener('click',()=>{$('#themePopover').classList.toggle('hidden');$('#menuPopover').classList.add('hidden')});$('#menuButton').addEventListener('click',()=>{$('#menuPopover').classList.toggle('hidden');$('#themePopover').classList.add('hidden')});$('#themeOptions').addEventListener('click',e=>{const b=e.target.closest('[data-theme]');if(b){applyTheme(b.dataset.theme);$('#themePopover').classList.add('hidden')}});$$('[data-close-popover]').forEach(b=>b.addEventListener('click',()=>$('#'+b.dataset.closePopover).classList.add('hidden')));$$('[data-close-dialog]').forEach(b=>b.addEventListener('click',()=>closeDialog('#'+b.dataset.closeDialog)));
+  $('#copyInvite').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(state.board.join_code);toast('Código copiado.')}catch{toast(state.board.join_code)}});$('#notifyButton').addEventListener('click',()=>{setPage('notices');showUnreadNotices()});$('#switchBoard').addEventListener('click',()=>{if(state.mode==='demo')return toast('Modo demonstração.');renderExistingBoards();showOnly('#boardScreen');$('#menuPopover').classList.add('hidden')});$('#logoutButton').addEventListener('click',async()=>{if(state.mode==='demo')return toast('Modo demonstração.');await state.supabase.auth.signOut();showOnly('#authScreen')});
+  document.addEventListener('click',e=>{if(!e.target.closest('#themePopover')&&!e.target.closest('#themeButton'))$('#themePopover').classList.add('hidden');if(!e.target.closest('#menuPopover')&&!e.target.closest('#menuButton'))$('#menuPopover').classList.add('hidden')});
+}
+async function boot(){applyTheme(localStorage.getItem('nosso_tempo_theme')||'peach');renderThemes();defaultRange();bindEvents();if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./service-worker.js').catch(console.warn);if(state.mode==='demo'){demoLoad();$('#demoBanner').classList.remove('hidden');enterApp()}else await initOnline()}
+boot();
 })();
