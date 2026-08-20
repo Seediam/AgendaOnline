@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#f7d9cf" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Nosso Tempo" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <title>Nosso Tempo — Calendário Compartilhado</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="toast" class="toast" aria-live="polite"></div>
+
+  <section id="authScreen" class="screen auth-screen hidden">
+    <div class="auth-card">
+      <div class="brand-mark">♡</div>
+      <p class="eyebrow">CALENDÁRIO COMPARTILHADO</p>
+      <h1>Nosso Tempo</h1>
+      <p class="muted">
+        Um lugar para transformar “a gente precisa fazer” em dias realmente vividos juntos.
+      </p>
+
+      <div class="tabs">
+        <button class="tab active" data-auth-tab="login">Entrar</button>
+        <button class="tab" data-auth-tab="signup">Criar conta</button>
+      </div>
+
+      <form id="authForm" class="stack">
+        <label>
+          E-mail
+          <input id="authEmail" type="email" autocomplete="email" required placeholder="voce@email.com" />
+        </label>
+        <label>
+          Senha
+          <input id="authPassword" type="password" minlength="6" required placeholder="mínimo 6 caracteres" />
+        </label>
+        <button id="authSubmit" class="btn primary" type="submit">Entrar</button>
+      </form>
+      <p id="authHint" class="tiny muted"></p>
+    </div>
+  </section>
+
+  <section id="boardScreen" class="screen board-screen hidden">
+    <div class="auth-card wide">
+      <div class="brand-mark">♡</div>
+      <p class="eyebrow">PRIMEIRO PASSO</p>
+      <h1>Crie ou entre na agenda</h1>
+      <p class="muted">Uma pessoa cria. A outra entra usando o código de convite.</p>
+
+      <div class="two-col">
+        <form id="createBoardForm" class="panel stack">
+          <h3>Criar nova agenda</h3>
+          <label>
+            Nome da agenda
+            <input id="boardName" maxlength="60" value="Nosso Tempo" required />
+          </label>
+          <label>
+            Seu nome
+            <input id="creatorName" maxlength="40" placeholder="Ex.: Nathalia" required />
+          </label>
+          <button class="btn primary" type="submit">Criar agenda</button>
+        </form>
+
+        <form id="joinBoardForm" class="panel stack">
+          <h3>Entrar com convite</h3>
+          <label>
+            Código
+            <input id="joinCode" maxlength="12" placeholder="Ex.: A1B2C3D4" required />
+          </label>
+          <label>
+            Seu nome
+            <input id="joinName" maxlength="40" placeholder="Como quer aparecer" required />
+          </label>
+          <button class="btn secondary" type="submit">Entrar na agenda</button>
+        </form>
+      </div>
+
+      <div id="existingBoards" class="existing-boards"></div>
+      <button id="boardLogout" class="link-btn" type="button">Sair da conta</button>
+    </div>
+  </section>
+
+  <main id="app" class="app hidden">
+    <header class="topbar">
+      <div>
+        <div class="brand-line">
+          <span class="mini-heart">♡</span>
+          <div>
+            <p class="eyebrow">NOSSO CALENDÁRIO</p>
+            <h1 id="appTitle">Nosso Tempo</h1>
+          </div>
+        </div>
+        <p class="subtitle">tempo de qualidade • rotina • cuidado • movimento</p>
+      </div>
+
+      <div class="top-actions">
+        <button id="themeButton" class="icon-btn" title="Trocar cores">🎨</button>
+        <button id="notifyButton" class="icon-btn" title="Ativar lembretes">🔔</button>
+        <button id="menuButton" class="icon-btn" title="Opções">⋯</button>
+      </div>
+    </header>
+
+    <section id="demoBanner" class="demo-banner hidden">
+      <strong>Modo demonstração local.</strong>
+      Você já pode testar tudo. Para sincronizar entre duas pessoas, configure o Supabase seguindo o README.
+    </section>
+
+    <section class="hero-grid">
+      <article class="quote-card">
+        <span class="quote-mark">“</span>
+        <p>
+          Quando a gente vive coisas juntos, o tempo solo deixa de parecer distância
+          e passa a ser só espaço.
+        </p>
+        <small>um dia de cada vez ♡</small>
+      </article>
+
+      <article class="weather-card">
+        <div class="weather-icon" id="todayWeatherIcon">⛅</div>
+        <div>
+          <p class="eyebrow">CASCATINHA • PETRÓPOLIS</p>
+          <h2 id="todayWeatherTitle">Carregando clima...</h2>
+          <p id="todayWeatherText" class="muted">Previsão para organizar o dia.</p>
+        </div>
+      </article>
+
+      <article class="invite-card">
+        <p class="eyebrow">CÓDIGO DA AGENDA</p>
+        <div class="invite-row">
+          <strong id="inviteCode">LOCAL</strong>
+          <button id="copyInvite" class="small-btn">Copiar</button>
+        </div>
+        <p class="tiny muted">Compartilhe apenas com a pessoa que vai editar com você.</p>
+      </article>
+    </section>
+
+    <section class="controls">
+      <div class="date-control">
+        <label>Início <input id="startDate" type="date" /></label>
+        <span>até</span>
+        <label>Fim <input id="endDate" type="date" /></label>
+        <button id="applyRange" class="btn secondary compact">Atualizar</button>
+      </div>
+
+      <div class="legend">
+        <span><i class="dot good"></i> tempo bom</span>
+        <span><i class="dot bad"></i> tempo ruim</span>
+        <span><i class="dot done"></i> realizado</span>
+      </div>
+    </section>
+
+    <section class="balance-strip">
+      <div>
+        <p class="eyebrow">EQUILÍBRIO DO PERÍODO</p>
+        <h3 id="balanceTitle">Alternem quem escolhe o dia</h3>
+      </div>
+      <div id="memberStats" class="member-stats"></div>
+    </section>
+
+    <section class="mobile-calendar-toolbar" aria-label="Navegação do calendário">
+      <button id="prevPeriod" class="calendar-nav-btn" type="button" aria-label="Período anterior">‹</button>
+      <button id="todayButton" class="calendar-today-btn" type="button">Hoje</button>
+      <div class="mobile-range-copy">
+        <strong id="mobileRangeTitle">Período</strong>
+        <small id="mobileRangeSubtitle">Calendário compartilhado</small>
+      </div>
+      <button id="nextPeriod" class="calendar-nav-btn" type="button" aria-label="Próximo período">›</button>
+    </section>
+
+    <section class="calendar-shell">
+      <div class="weekday-row">
+        <span>Seg</span><span>Ter</span><span>Qua</span><span>Qui</span><span>Sex</span><span>Sáb</span><span>Dom</span>
+      </div>
+      <div id="calendarGrid" class="calendar-grid"></div>
+    </section>
+
+    <button id="mobileFab" class="mobile-fab" type="button" aria-label="Adicionar ou editar o dia de hoje">+</button>
+
+    <footer>
+      <span>Nosso Tempo ♡</span>
+      <span id="syncStatus">salvo neste dispositivo</span>
+    </footer>
+  </main>
+
+  <div id="themePopover" class="popover hidden">
+    <div class="popover-head">
+      <strong>Escolha suas cores</strong>
+      <button data-close-popover="themePopover">×</button>
+    </div>
+    <p class="tiny muted">A cor fica só no seu aparelho.</p>
+    <div id="themeOptions" class="theme-options"></div>
+  </div>
+
+  <div id="menuPopover" class="popover hidden">
+    <div class="popover-head">
+      <strong>Agenda</strong>
+      <button data-close-popover="menuPopover">×</button>
+    </div>
+    <button id="switchBoard" class="menu-item">⇄ Trocar de agenda</button>
+    <button id="logoutButton" class="menu-item danger">↪ Sair da conta</button>
+  </div>
+
+  <dialog id="planDialog" class="plan-dialog">
+    <form id="planForm" method="dialog">
+      <div class="sheet-handle" aria-hidden="true"></div>
+      <div class="dialog-head">
+        <div>
+          <p id="dialogWeekday" class="eyebrow">SEGUNDA-FEIRA</p>
+          <h2 id="dialogDate">20 de agosto</h2>
+        </div>
+        <button id="closeDialog" type="button" class="close-btn">×</button>
+      </div>
+
+      <div id="dialogWeather" class="dialog-weather"></div>
+
+      <div class="form-grid">
+        <label>
+          Quem escolhe esse dia?
+          <select id="chooserSelect"></select>
+        </label>
+
+        <label>
+          Categoria
+          <select id="category">
+            <option value="💛 Tempo juntos">💛 Tempo juntos</option>
+            <option value="🏃 Movimento">🏃 Movimento</option>
+            <option value="🎲 Lazer">🎲 Lazer</option>
+            <option value="🏠 Casa">🏠 Casa</option>
+            <option value="💼 Trabalho / projeto">💼 Trabalho / projeto</option>
+            <option value="🌿 Cuidado">🌿 Cuidado</option>
+            <option value="✨ Outro">✨ Outro</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="option-box good-box">
+        <div class="option-title"><span>☀️</span><strong>Se o tempo estiver bom</strong></div>
+        <textarea id="goodOption" rows="3" maxlength="240" placeholder="Ex.: correr um pouco e depois caminhar juntos"></textarea>
+      </div>
+
+      <div class="option-box bad-box">
+        <div class="option-title"><span>🌧️</span><strong>Se o tempo estiver ruim</strong></div>
+        <textarea id="badOption" rows="3" maxlength="240" placeholder="Ex.: leitura juntos ou um jogo"></textarea>
+      </div>
+
+      <div class="form-grid three">
+        <label>
+          Horário
+          <input id="planTime" type="time" />
+        </label>
+
+        <label>
+          Qual plano vale?
+          <select id="selectedOption">
+            <option value="auto">Decidir pelo clima</option>
+            <option value="good">Tempo bom</option>
+            <option value="bad">Tempo ruim</option>
+          </select>
+        </label>
+
+        <label>
+          Status
+          <select id="planStatus">
+            <option value="planned">Planejado</option>
+            <option value="done">Realizado ✓</option>
+            <option value="skipped">Não rolou</option>
+          </select>
+        </label>
+      </div>
+
+      <label>
+        Lembrete
+        <input id="reminderAt" type="datetime-local" />
+        <small class="field-note">O aviso do navegador funciona quando o site estiver aberto. Para garantir no celular, use também “Baixar lembrete”.</small>
+      </label>
+
+      <label>
+        Anotações
+        <textarea id="notes" rows="2" maxlength="400" placeholder="Qualquer detalhe que vocês queiram lembrar..."></textarea>
+      </label>
+
+      <div class="dialog-actions">
+        <button id="deletePlan" type="button" class="btn ghost danger-text">Excluir</button>
+        <div class="right-actions">
+          <button id="downloadICS" type="button" class="btn ghost">Baixar lembrete .ics</button>
+          <button id="savePlan" type="submit" class="btn primary">Salvar dia</button>
+        </div>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
