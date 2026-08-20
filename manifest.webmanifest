@@ -1,11 +1,18 @@
 {
-  "name": "Nosso Tempo — Vida Compartilhada",
+  "name": "Nosso Tempo — Painel da Casa",
   "short_name": "Nosso Tempo",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "background_color": "#fffaf7",
   "theme_color": "#df8f7c",
-  "description": "Calendário, checklists, casa, finanças, pets e recados compartilhados.",
-  "icons": [{"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+  "description": "Painel compartilhado de calendário, casa, finanças, compras, pets, metas, estoque e recados.",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
 }
